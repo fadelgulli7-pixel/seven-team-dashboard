@@ -1,0 +1,5 @@
+SEVEN Team Dashboard 3.0.1
+Local verification: 10 Node automated tests passed; JavaScript syntax checks passed.
+Coverage includes HTTP workflows, roles, CSRF, duplicate submissions, review history, storage rollback, locking, backups and owner recovery.
+Browser visual testing was unavailable because Chromium was not installed. Inline JavaScript syntax and CSP hashes were checked automatically.
+No live Render deployment or existing production-data migration was performed.

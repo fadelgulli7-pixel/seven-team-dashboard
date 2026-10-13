@@ -1,0 +1,22 @@
+SEVEN Team — وەشانا چاککری 3.0.1
+
+هەڵەیا Cannot find module './lib/store' چاک بوو:
+فولدەرێ lib هاتە زێدەکرن و store.js و security.js تێدا نە.
+
+1. ZIP ڤەکە. هەمی ناڤەرۆکا فولدەرا seven-team-dashboard-main بار بکە بۆ GitHub.
+2. server.js و package.json و index.html پێدڤیە ل ڕەگێ repository بن.
+3. lib وەک فولدەر بار بکە؛ store.js و security.js ل ناڤ lib بن. ZIP ب خۆ بار نەکە.
+4. Build Command: npm ci
+5. Start Command: npm start
+6. NODE_ENV=production
+7. DATA_DIR پێدڤیە ل سەر دیسکێ هەمیشەیی بیت. ئەگەر دیسک ل /var/data گرێدایە، DATA_DIR=/var/data/seven دابنێ.
+8. بۆ تیمەکا نوو: SETUP_TOKEN ب کۆدەکێ نهێنی یێ کەمتر ژ 24 پیتان نەبیت دابنێ.
+9. پاش Deploy، /health پێدڤیە build: 2026-10-12-team-v3.0.1 نیشان بدەت.
+
+گرنگ بۆ داتایێن کەڤن:
+ئەڤ ZIP ـە داتایێن ل سەرڤەرێ تە تێدا نینن. ئەگەر هەژمار یان کارێن تیمێ هەن، پێش Deploy کۆپیا team-data.json دابگرە.
+شێوەیێ داتایێن کەڤن و شێوازێ پاسوۆردێن وان ژ ڤی ZIP ناهێنە زانین. گواستنا خۆکار بۆ داتایێن نەناس هاتیە نەکرن.
+ئەگەر Invalid team data هات، فایلێ داتایان ژێ نەبە و هەژمارا خودان یا نوو ل شوینا کەڤن چێنەکە.
+
+تاقیکرن: npm test
+ڕێنماییا تەمام ل README.md هەیە.
