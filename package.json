@@ -1,8 +1,0 @@
-{
-  "name": "seven-team-dashboard",
-  "version": "3.0.0",
-  "private": true,
-  "description": "SEVEN team workspace with protected setup, audited work reviews and durable file storage",
-  "scripts": {"start": "node server.js", "test": "node --test test/*.test.js"},
-  "engines": {"node": ">=22"}
-}
