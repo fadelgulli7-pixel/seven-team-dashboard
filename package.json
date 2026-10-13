@@ -1,14 +1,14 @@
 {
   "name": "seven-team-dashboard",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "private": true,
   "description": "SEVEN team workspace with protected setup, audited work reviews and durable file storage",
   "scripts": {
     "start": "node server.js",
     "test": "node --test test/*.test.js",
-    "check": "node --check server.js && node --check tools.js && node --check lib/store.js && node --check lib/security.js"
+    "check": "node --check server.js && node --check tools.js && node --check lib/store.js && node --check lib/security.js && node --check lib/profile.js && node --check assets/contributions.js"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13.0"
   }
 }

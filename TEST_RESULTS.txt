@@ -1,5 +1,16 @@
-SEVEN Team Dashboard 3.0.1
-Local verification: 10 Node automated tests passed; JavaScript syntax checks passed.
-Coverage includes HTTP workflows, roles, CSRF, duplicate submissions, review history, storage rollback, locking, backups and owner recovery.
-Browser visual testing was unavailable because Chromium was not installed. Inline JavaScript syntax and CSP hashes were checked automatically.
-No live Render deployment or existing production-data migration was performed.
+SEVEN Family 3.1.0 — 2026-10-13
+Runtime: Node v24.19.0
+npm test: PASS, 13 tests, 0 failures.
+npm run check: PASS.
+
+Covered: login/setup access control, CSRF and origin protection, review ownership,
+concurrent submissions, approval/rejection/correction, role/password/session controls,
+storage locking and atomic writes, invalid data protection, recovery,
+inline JavaScript syntax and CSP hashes, authenticated profile name/photo updates,
+photo persistence and asset delivery, approved-only contribution percentages,
+shared ranks, zero-contribution members, frontend summary rendering and escaping.
+
+Visual/browser limitation: Playwright could not launch because Chromium was absent.
+Downloading Chromium failed in this environment. No successful browser visual QA
+or full browser image-picker test is claimed. Mobile/desktop/RTL styling is implemented
+but should be visually checked on the deployed site. Live Render was not changed.

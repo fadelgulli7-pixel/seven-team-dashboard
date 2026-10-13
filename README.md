@@ -1,3 +1,37 @@
+# SEVEN Family — design and contributions update 3.1.0
+
+This package updates the uploaded application. It does not deploy a live service.
+
+## New in this version
+
+- Gold/violet/black responsive design and the supplied generated SEVEN coin logo.
+- Personal summary after sign-in: name, photo, approved count, contribution percentage, rank and pending count.
+- Edit profile: each member changes their own name and photo. JPEG, PNG and WebP uploads are cropped centrally and compressed in the browser to a 256px JPEG; photos remain with the existing persistent team data. Initials appear until a photo is uploaded. This is not an automatic Telegram photo import.
+- Members page lists everyone, sorted by approved contributions, with names, pictures, counts and percentages. Tap a name for their profile and recent work.
+- Three leading contributors appear on the overview and reports. Reports include every member, including zero contributors. Only contributors with approved work receive a podium card.
+- Reports offer week, month and all-time periods using Baghdad time. The overview/member summaries are all-time.
+- Percentage = approved work by this member / all approved team work in the chosen period × 100. Pending/rejected work never increases rank. Suspended members retain their historical contributions. Equal counts share a rank; tied display order is by name, then member ID. Rounded percentages may sum to 99.9% or 100.1%.
+- Profile editing, member lists, reports and existing English/Arabic/Badini UI are supported. Activity forms now include selectable platform tiles.
+- Report exports include contribution counts, percentages and ranks, excluding photo bytes.
+- Existing schema 3 accounts and records remain compatible. No reset or new database is required.
+
+## Update an existing deployment
+
+1. Use the app's owner-only backup before deploying.
+2. Unzip and upload the CONTENTS of `seven-team-dashboard-main` to your repository root. Include `assets`, `lib` and `test` along with `server.js`, `index.html`, `package.json`, `package-lock.json` and `tools.js`.
+3. Keep the current persistent disk, `DATA_DIR` and other environment values. Do not upload or replace production data with a local empty directory.
+4. Build: `npm ci`. Start: `npm start`. Use Node 24 (or another supported Node version >=22.13).
+5. Check `/health` for build `2026-10-13-family-v3.1.0`.
+6. Sign in with the existing account. Choose Edit profile to add your name/photo; open Team and Reports to see contributions.
+
+No passwords, live user records, development fixtures, or node_modules are included.
+
+## Verification limits
+
+See TEST_RESULTS.txt. Server/security/storage, ranking logic and frontend render output tests pass. A real-browser visual/end-to-end run could not be completed because Chromium was unavailable and its download failed. Check mobile layout and the image picker after deployment. The layout recreates the reference style; it is not a verified pixel-identical copy.
+
+---
+
 # SEVEN Team Dashboard 3.0.1
 
 An English / Arabic / Badini Kurdish team activity dashboard. This repair supplies the missing `lib/store.js`, `lib/security.js` and automated tests. It preserves the supplied UI and review workflow. It is a team dashboard, not the SEVEN mining bot or a payment service.
@@ -17,7 +51,7 @@ Required paths:
 - `tools.js`
 - `test/app.test.js`
 
-`npm run check` checks JavaScript syntax. `npm test` runs the included tests. `npm start` starts the server. Node.js 22 or newer is required; runtime dependencies are all built into Node.
+`npm run check` checks JavaScript syntax. `npm test` runs the included tests. `npm start` starts the server. Node.js 22.13 or newer is required; runtime dependencies are all built into Node.
 
 ## Render settings
 
@@ -31,7 +65,7 @@ Use the repository directory containing `package.json` as the service root.
 - For a new workspace: set `SETUP_TOKEN` to a secret random string of at least 24 characters. The app never sends its value to visitors.
 - Use one service instance. The JSON store is not designed for multiple writers or horizontal scaling.
 
-The server uses Render's supplied `PORT` and binds to `0.0.0.0`. `/health` should report build `2026-10-12-team-v3.0.1`. Merely setting `DATA_DIR` does not create a persistent disk. Disk/provider setup must be completed in your own service; this package does not provision or purchase hosting.
+The server uses Render's supplied `PORT` and binds to `0.0.0.0`. `/health` should report build `2026-10-13-family-v3.1.0`. Merely setting `DATA_DIR` does not create a persistent disk. Disk/provider setup must be completed in your own service; this package does not provision or purchase hosting.
 
 Generate a setup token privately on your own computer/server:
 

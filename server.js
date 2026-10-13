@@ -4,14 +4,15 @@ const fs=require('node:fs/promises');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const {FileStore}=require('./lib/store');
+const {validPhoto}=require('./lib/profile');
 const {hashPassword,verifyPassword,equalSecret,Limiter}=require('./lib/security');
 const categories=['Marketing','Content','Community','Partnership','Development','Other'];
 const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Other'];
-const BUILD='2026-10-12-team-v3.0.1';
+const BUILD='2026-10-13-family-v3.1.0';
 const TTL=12*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
-const safeMember=m=>Object.fromEntries(['id','name','handle','username','role','initials','createdAt','active','mustChangePassword'].map(k=>[k,m[k]]));
+const safeMember=m=>Object.fromEntries(['id','name','handle','username','role','initials','createdAt','active','mustChangePassword','photo'].map(k=>[k,m[k]]));
 const validPassword=p=>typeof p==='string'&&p.length>=12&&p.length<=200;
 function memberInput(body) {
   if(typeof body.name!=='string'||body.name.trim().length<2||body.name.trim().length>50||typeof body.username!=='string'||!/^[a-zA-Z0-9_.-]{3,32}$/.test(body.username)||!validPassword(body.password))throw error(400,'Enter a name, a valid username, and a password of 12–200 characters.');
@@ -30,10 +31,10 @@ function activityInput(body) {
 function fingerprint(a){return crypto.createHash('sha256').update(JSON.stringify([a.memberId,a.title.toLowerCase(),a.category,a.platform,a.description,a.link])).digest('hex');}
 function audit(d,actor,action,target,details={}) {d.audit.push({id:crypto.randomUUID(),actorId:actor.id,actorName:actor.name,action,target,details,createdAt:new Date().toISOString()});}
 function send(res,status,value,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers});res.end(JSON.stringify(value));}
-async function readBody(req){
+async function readBody(req,maxBytes=32768){
   if(!String(req.headers['content-type']||'').startsWith('application/json'))throw error(415,'Send JSON data.');
   const chunks=[];let total=0;
-  for await(const chunk of req){total+=chunk.length;if(total>32768)throw error(413,'Request is too large.');chunks.push(chunk);}
+  for await(const chunk of req){total+=chunk.length;if(total>maxBytes)throw error(413,'Request is too large.');chunks.push(chunk);}
   let body;try{body=JSON.parse(Buffer.concat(chunks).toString('utf8')||'{}');}catch{throw error(400,'Invalid JSON.');}
   if(!body||typeof body!=='object'||Array.isArray(body))throw error(400,'Invalid request.');return body;
 }
@@ -105,6 +106,14 @@ async function createApp(options={}) {
       revoke(member.id);return beginSession(req,res,updated);
     }
     actor(req);
+    if(req.method==='POST'&&route==='/api/profile'){
+      throttle('profile:'+member.id,30);const b=await readBody(req,160000);
+      const name=typeof b.name==='string'?b.name.trim():'';
+      if(name.length<2||name.length>50)throw error(400,'Use a name of 2–50 characters.');
+      if(typeof b.photo!=='string'||(b.photo!==''&&!validPhoto(b.photo)))throw error(400,'Choose a JPEG photo smaller than 100 KB.');
+      const updated=await store.transaction(d=>{const who=actor(req,d);Object.assign(who,{name,initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),photo:b.photo});audit(d,who,'profile_updated',who.id);return who;});
+      return send(res,200,{member:safeMember(updated)});
+    }
     if(req.method==='GET'&&route==='/api/data')return send(res,200,{member:safeMember(member),members:store.data.members.map(safeMember),activities:store.data.activities.map(({history,fingerprint,requestKey,...a})=>a),revision:store.data.revision,build:BUILD});
     if(req.method==='GET'&&route==='/api/audit'){owner(member);return send(res,200,{events:store.data.audit.slice(-200).reverse()});}
     if(req.method==='POST'&&route==='/api/backup'){
@@ -168,6 +177,8 @@ async function createApp(options={}) {
       if(url.pathname.startsWith('/api/'))return await api(req,res,url);
       if(url.pathname==='/health'&&req.method==='GET')return send(res,200,{ok:true,build:BUILD});
       if(!['GET','HEAD'].includes(req.method))throw error(405,'Method not allowed.');
+      const assets={'/assets/seven-logo.png':['seven-logo.png','image/png'],'/assets/contributions.js':['contributions.js','text/javascript; charset=utf-8']};
+      if(assets[url.pathname]){const [file,type]=assets[url.pathname];const bytes=await fs.readFile(path.join(__dirname,'assets',file));res.writeHead(200,{'Content-Type':type,'X-Content-Type-Options':'nosniff','Cache-Control':'public, max-age=3600'});return res.end(req.method==='HEAD'?undefined:bytes);}
       if(!['/','/index.html'].includes(url.pathname))throw error(404,'Not found.');
       res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'same-origin','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':`default-src 'self'; script-src 'self' ${scripts}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'`});res.end(req.method==='HEAD'?undefined:html);
     }catch(e){if(!res.headersSent&&!res.destroyed)send(res,e.status||500,{error:e.status?e.message:'Could not save or complete the request. Please try again.'});if(!e.status)console.error('Request failed:',e.code||e.message);}
