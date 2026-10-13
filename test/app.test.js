@@ -132,3 +132,42 @@ test('maintenance backup verification and owner recovery preserve records and su
   assert(await verifyPassword('Recovery-password-123!',owner));assert.equal(await verifyPassword(password,owner),false);
   assert.equal(restored.data.audit.at(-1).action,'owner_password_recovered');await restored.close();
 });
+
+test('profile updates are authenticated, private to the member, persisted and validated',async t=>{
+  const f=await fixture(t),anonymous=f.client();
+  assert.equal((await anonymous('/api/profile',{name:'Changed',photo:''})).status,401);
+  assert.equal((await f.owner('/api/profile',{name:'Changed',photo:'data:image/svg+xml;base64,AAAA'})).status,400);
+  assert.equal((await f.owner('/api/profile',{name:'A',photo:''})).status,400);
+  const m=(await f.owner('/api/members',{name:'Other Person',username:'person',password})).body.member;
+  const photo='data:image/jpeg;base64,'+(await fs.readFile(path.join(__dirname,'fixtures/avatar.jpg'))).toString('base64');
+  const updated=await f.owner('/api/profile',{name:'New Owner Name',photo,id:m.id});
+  assert.equal(updated.status,200);assert.equal(updated.body.member.name,'New Owner Name');
+  const result=(await f.owner('/api/data')).body;
+  assert.equal(result.members.find(x=>x.id===m.id).name,'Other Person');
+  assert.equal(result.member.initials,'NO');
+  const disk=JSON.parse(await fs.readFile(path.join(f.dir,'team-data.json'),'utf8'));
+  assert.equal(disk.members[0].name,'New Owner Name');assert.equal(disk.members[0].photo,photo);assert.equal(result.member.photo,photo);
+  for(const asset of ['seven-logo.png','contributions.js']){const response=await fetch(f.url+'/assets/'+asset);assert.equal(response.status,200);assert((await response.arrayBuffer()).byteLength>100);}
+});
+test('rankings use approved work only, include everyone, share tied ranks and handle zero work',()=>{
+  const {summarize}=require('../assets/contributions');
+  const members=[{id:'a',name:'Alpha',active:true},{id:'b',name:'Beta',active:false},{id:'c',name:'Charlie',active:true}];
+  const rows=summarize(members,[{memberId:'a',status:'approved'},{memberId:'b',status:'approved'},{memberId:'c',status:'pending'},{memberId:'c',status:'rejected'}]);
+  assert.deepEqual(rows.map(m=>[m.id,m.count,m.percent,m.rank]),[['a',1,50,1],['b',1,50,1],['c',0,0,null]]);
+  assert.equal(rows.reduce((sum,m)=>sum+m.percent,0),100);
+  assert(summarize(members,[]).every(m=>m.percent===0&&m.rank===null));
+});
+
+test('frontend summaries render real member names, all rows, percentages and safe text',async()=>{
+  const html=await fs.readFile(path.join(__dirname,'../index.html'),'utf8');
+  const code=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]).join('\n').replace('bindLanguagePickers();applyLanguage();start();','');
+  const elements=new Map();const get=s=>{if(!elements.has(s))elements.set(s,{innerHTML:'',value:({'#chartRange':'week','#reportRange':'all','#statusFilter':'all','#feedLimit':'50'})[s]||'',classList:{toggle(){}}});return elements.get(s)};
+  const context=vm.createContext({document:{querySelector:get,querySelectorAll(){return []}},localStorage:{getItem(){return 'en'}},Intl,Date,SevenContributions:require('../assets/contributions')});
+  vm.runInContext(code,context);
+  vm.runInContext(`applyLanguage=()=>{};data={members:[{id:'a',name:'Alice <script>',handle:'@alice',initials:'AL',role:'Owner',active:true},{id:'b',name:'Bob',handle:'@bob',initials:'BO',role:'Member',active:true}],activities:[{id:'work',memberId:'a',title:'Campaign',category:'Marketing',platform:'Telegram',status:'approved',description:'',createdAt:new Date().toISOString()}]};currentUser=data.members[0];render();`,context);
+  assert.match(get('#personalSummary').innerHTML,/Alice &lt;script&gt;/);
+  assert.match(get('#personalSummary').innerHTML,/100.0%/);
+  assert.match(get('#memberList').innerHTML,/Bob/);
+  assert.match(get('#rankList').innerHTML,/0.0%/);
+  assert.equal((get('#homeLeaders').innerHTML.match(/class="podium-card/g)||[]).length,1);
+});
