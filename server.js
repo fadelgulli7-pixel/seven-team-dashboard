@@ -4,11 +4,12 @@ const fs=require('node:fs/promises');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const {FileStore}=require('./lib/store');
+const Treasury=require('./lib/treasury');
 const {validPhoto}=require('./lib/profile');
 const {hashPassword,verifyPassword,equalSecret,Limiter}=require('./lib/security');
 const categories=['Marketing','Content','Community','Partnership','Development','Other'];
 const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Other'];
-const BUILD='2026-10-13-family-v3.1.0';
+const BUILD='2026-10-16-family-v4.0.0';
 const TTL=12*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
@@ -47,6 +48,7 @@ async function createApp(options={}) {
   const dummy=await hashPassword(crypto.randomBytes(32).toString('hex'));
   const store=options.store||await new FileStore(path.resolve(dataDir)).open();
   const sessions=new Map(),limiter=new Limiter();
+  const treasury=options.treasury||Treasury.createTreasury();
   let cryptoJobs=0;
   async function cryptoWork(fn){if(cryptoJobs>=8)throw error(429,'Service is busy. Try again shortly.');cryptoJobs++;try{return await fn();}finally{cryptoJobs--;}}
   function secure(req){return req.socket.encrypted||env.NODE_ENV==='production'||req.headers['x-forwarded-proto']==='https';}
@@ -113,6 +115,12 @@ async function createApp(options={}) {
       if(typeof b.photo!=='string'||(b.photo!==''&&!validPhoto(b.photo)))throw error(400,'Choose a JPEG photo smaller than 100 KB.');
       const updated=await store.transaction(d=>{const who=actor(req,d);Object.assign(who,{name,initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),photo:b.photo});audit(d,who,'profile_updated',who.id);return who;});
       return send(res,200,{member:safeMember(updated)});
+    }
+    if(req.method==='GET'&&route==='/api/finance')return send(res,200,Treasury.summary(store.data,await treasury()));
+    if(req.method==='POST'&&['/api/finance/settle','/api/finance/payment','/api/finance/void'].includes(route)){
+      owner(actor(req));const b=await readBody(req);const state=route.endsWith('/settle')?await treasury():null;
+      const result=await store.transaction(d=>{const m=actor(req,d);owner(m);const r=route.endsWith('/settle')?Treasury.settle(d,state,b,m):route.endsWith('/payment')?Treasury.payment(d,b,m):Treasury.voidPayment(d,b,m);audit(d,m,'finance.'+route.split('/').pop(),r.id,{assetId:r.assetId,raw:r.raw});return r;});
+      return send(res,201,{id:result.id});
     }
     if(req.method==='GET'&&route==='/api/data')return send(res,200,{member:safeMember(member),members:store.data.members.map(safeMember),activities:store.data.activities.map(({history,fingerprint,requestKey,...a})=>a),revision:store.data.revision,build:BUILD});
     if(req.method==='GET'&&route==='/api/audit'){owner(member);return send(res,200,{events:store.data.audit.slice(-200).reverse()});}
