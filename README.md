@@ -1,3 +1,30 @@
+# v5.4 — campaign quality, seven locales and Phantom wallet payments
+
+## New languages
+English, Kurdish Badini and Arabic remain. Turkish, Persian, Spanish and French add 230 translated interface labels each, covering sign-in, profiles, pages, campaigns, reviews, rewards and Phantom payments. Some extended legacy help, detailed rate descriptions and technical errors retain English fallback. Member-authored names, briefs, notes and posts are not machine-translated. Persian, Arabic and Kurdish use RTL; the other locales use LTR.
+
+## Phantom payment flow
+Owner: Rewards → My payout wallet → Connect Phantom → Save changes. On a phone, this opens the panel inside Phantom's in-app browser; sign into the owner account there once. Select the intended Solana mainnet account before saving. Only its public address is stored; no wallet private key or seed is requested.
+
+For a member with earned unpaid rewards, click Send SEVEN, enter the explicitly agreed SEVEN amount for the displayed entire USD amount due, then prepare and confirm in Phantom. There is no implied USD/SEVEN exchange rate. The app builds a checked SPL-token transfer and recipient associated token account, Phantom signs it, and the server saves the exact signature before broadcasting those signed bytes. Only a confirmed/finalized chain result creates a USD payment ledger entry. Network SOL fees and any recipient-token-account rent are paid by the connected wallet and shown by Phantom.
+
+An uncertain chain result stays reserved; use My payout wallet → Check payment status. Do not make another manual transfer for it. Retries use the same signed bytes. Unsigned prepared jobs can expire after their blockhash expires; failed on-chain transactions create no payment. Existing manual payment records remain supported, but ledger payment/void actions are blocked while that member has a reserved wallet job. Confirmed on-chain ledger payments cannot be voided through the ordinary correction button.
+
+The default verified SEVEN mint is Ho3DNyGDTuKoFdA1bd6obE9xaL4RuStHUW1eLpodHS53 (9 decimals, classic SPL Token). Optional SOLANA_RPC_URL should point to a reliable Solana mainnet RPC. Optional SEVEN_TOKEN_MINT and SEVEN_TOKEN_DECIMALS must agree with the chain; mismatches fail before signing. This project does not use TREASURY_PRIVATE_KEY.
+
+## Campaign policy
+New work requires a complete member profile, an independently approved promotion page, and an active owner-created campaign. A campaign states its goal, content brief/acceptance criteria, deadline, output cap per member and posting interval. The UI starts at 3 outputs/member and 24 hours; the owner can change these when creating the campaign. These are project policy choices, not universal academic standards.
+
+Reviewers score accuracy, originality, usefulness, production and compliance from 0–20 each. Acceptance requires 75/100 and at least 15/20 for accuracy and compliance. All existing originality/evidence/quality confirmations, duplicate-proof checks, saved quotes and budget caps still apply. Human review is essential: scores do not automatically certify factual accuracy or detect all copied content. Historical submissions, grants, payments and quotes are preserved rather than retroactively rescored.
+
+The application checks campaign state/caps/spacing and review scores on the server. No automatic payment is earned merely by creating more posts, views or likes. Source eligibility and actual posting permission remain manual human checks.
+
+## Validation boundary
+Automated tests use real locally generated Ed25519 signatures, exact transaction-message comparison and mocked RPC responses for success, unknown results, expiry, tampering and duplicate settlement. No real-wallet payment, production migration or mobile-device end-to-end test was executed here. A low-value owner-approved pilot is needed after deployment before routine payouts.
+
+## Upgrade
+Upload the complete project, including package-lock.json and assets; npm install/ci installs locked dependencies. Keep the same persistent DATA_DIR and team-data.json. Do not upload node_modules or replace existing production data. Existing accounts, original quotes, rewards and histories remain valid. No campaign is created automatically: the owner defines the first real campaign before new submissions.
+
 # v5.3 — promotion channel approval and owner custom rewards
 
 - Required private three-part full name and phone number, plus existing Solana receiving address. Phone and full name are visible only to the member and owner.

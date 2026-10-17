@@ -6,13 +6,15 @@ const crypto=require('node:crypto');
 const {FileStore}=require('./lib/store');
 const Rewards=require('./lib/rewards');
 const Channels=require('./lib/channels');
+const Payouts=require('./lib/payouts');
+const Campaigns=require('./lib/campaigns');
 const Wallet=require('./lib/wallet');
 const Recovery=require('./lib/recovery');
 const {validPhoto}=require('./lib/profile');
 const {hashPassword,verifyPassword,equalSecret,Limiter}=require('./lib/security');
 const categories=['Marketing','Content','Community','Partnership','Development','Other'];
 const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Facebook','Other'];
-const BUILD='2026-10-17-marketing-v5.3.0';
+const BUILD='2026-10-17-marketing-v5.4.0';
 const TTL=12*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
@@ -33,7 +35,7 @@ function activityInput(body) {
   if(body.link){try{const u=new URL(body.link);if(!['https:','http:'].includes(u.protocol)||u.username||u.password||u.href.length>2048)throw Error();u.hash='';link=u.href;}catch{throw error(400,'Enter a valid http or https link.');}}
   return {title,category:body.category,platform:platforms.includes(body.platform)?body.platform:'Other',description,link};
 }
-function fingerprint(a){return crypto.createHash('sha256').update(JSON.stringify([a.memberId,a.title.toLowerCase(),a.category,a.platform,a.description,a.link,a.sourceId])).digest('hex');}
+function fingerprint(a){return crypto.createHash('sha256').update(JSON.stringify([a.memberId,a.title.toLowerCase(),a.category,a.platform,a.description,a.link,a.sourceId,a.campaignId])).digest('hex');}
 function audit(d,actor,action,target,details={}) {d.audit.push({id:crypto.randomUUID(),actorId:actor.id,actorName:actor.name,action,target,details,createdAt:new Date().toISOString()});}
 function send(res,status,value,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers});res.end(JSON.stringify(value));}
 async function readBody(req,maxBytes=32768){
@@ -45,12 +47,13 @@ async function readBody(req,maxBytes=32768){
 }
 async function createApp(options={}) {
   const env=options.env||process.env;
+  const payouts=Payouts.create(env,options.payoutConnection);
   const dataDir=options.dataDir||env.DATA_DIR||path.join(__dirname,'data');
   if(env.NODE_ENV==='production'&&!env.DATA_DIR&&!options.dataDir)throw Error('Set DATA_DIR to your persistent disk before production startup.');
   // Read required assets before acquiring the data-directory lock.
   const html=await fs.readFile(path.join(__dirname,'index.html'));
   // Refuse a partial upload before opening the persistent store.
-  for(const asset of ['seven-logo.png','contributions.js']){
+  for(const asset of ['seven-logo.png','contributions.js','languages.js','solana-web3.js']){
     try{await fs.access(path.join(__dirname,'assets',asset));}
     catch{throw Error('Missing assets/'+asset+'. Upload the entire assets folder from the ZIP.');}
   }
@@ -163,19 +166,25 @@ async function createApp(options={}) {
       const recipient=d.members.find(m=>m.id===b.memberId);
       if(!recipient||!recipient.active)throw error(400,'Choose an active member.');
       if(!Rewards.summary(d).members.some(m=>m.memberId===b.memberId&&m.dueCents>0))throw error(400,'This member has no unpaid reward.');
-      return send(res,200,Wallet.transfer(recipient.walletAddress,b.amount,env));
+      Payouts.unreserved(d,b.memberId);return send(res,200,Wallet.transfer(recipient.walletAddress,b.amount,env));
     }
+    if(route==='/api/campaigns'&&req.method==='GET')return send(res,200,{campaigns:store.data.campaigns||[]});
+    if(route==='/api/campaigns'&&req.method==='POST'){const b=await readBody(req);const campaign=await store.transaction(d=>{const who=actor(req,d);const c=Campaigns.create(d,b,who);audit(d,who,'campaign_created',c.id);return c;});return send(res,201,{campaign});}
+    if(route==='/api/campaigns/close'&&req.method==='POST'){const b=await readBody(req);await store.transaction(d=>{const who=actor(req,d);owner(who);const c=d.campaigns?.find(c=>c.id===b.id);if(!c)throw error(404,'Campaign not found.');c.active=false;audit(d,who,'campaign_closed',c.id);});return send(res,200,{ok:true});}
+    if(route==='/api/payout/config'&&req.method==='GET'){owner(member);return send(res,200,{config:Payouts.config(store.data),jobs:(store.data.payoutJobs||[]).map(({signedTransaction,message,transaction,...j})=>j)});}
+    if(route==='/api/payout/config'&&req.method==='POST'){const b=await readBody(req);const cfg=await store.transaction(d=>{const who=actor(req,d);owner(who);const cfg=Payouts.configure(d,b);audit(d,who,'payout_wallet_updated',who.id);return cfg;});return send(res,200,{config:cfg});}
+    if(req.method==='POST'&&['/api/payout/prepare','/api/payout/submit','/api/payout/reconcile'].includes(route)){owner(member);const b=await readBody(req);const who=actor(req);owner(who);throttle('payout:'+who.id,30,60000);const job=route.endsWith('/prepare')?await payouts.prepare(store,b,who):route.endsWith('/submit')?await payouts.submit(store,b,who):await payouts.reconcile(store,b.jobId,who);return send(res,200,{job});}
     if(req.method==='GET'&&route==='/api/rewards')return send(res,200,rewardView());
     if(req.method==='GET'&&route==='/api/workspace'){
       const d=store.data;
-      return send(res,200,{member:safeMember(member),members:d.members.map(m=>safeMember(m,member)),activities:d.activities.map(({history,fingerprint,requestKey,...a})=>a),revision:d.revision,build:BUILD,rewards:rewardView()});
+      return send(res,200,{member:safeMember(member),members:d.members.map(m=>safeMember(m,member)),activities:d.activities.map(({history,fingerprint,requestKey,...a})=>a),revision:d.revision,build:BUILD,campaigns:d.campaigns||[],rewards:rewardView()});
     }
     if(req.method==='POST'&&['/api/rewards/policy','/api/rewards/payment','/api/rewards/void','/api/rewards/award','/api/rewards/referral','/api/rewards/referral-review'].includes(route)){
       const b=await readBody(req);const result=await store.transaction(d=>{const who=actor(req,d);if(b.revision!==d.revision)throw error(409,'This record changed. Refresh and try again.');let r;
         if(route.endsWith('/referral')){throttle('referral-claim:'+who.id,20,60000);r=Rewards.claimReferral(d,b,who);}
         else if(route.endsWith('/referral-review')){r=Rewards.reviewReferral(d,b,who);}
         else if(route.endsWith('/award')){const a=d.activities.find(a=>a.id===b.activityId);if(!a)throw error(404,'Activity not found.');if(b.version!==a.version)throw error(409,'This record changed. Refresh and try again.');r=Rewards.award(d,a,b,who);if(!r)throw error(400,'Choose a paid reward type.');}
-        else{owner(who);r=route.endsWith('/policy')?Rewards.updatePolicy(d,b):route.endsWith('/payment')?Rewards.payment(d,b,who):Rewards.voidEntry(d,b,who);}
+        else{owner(who);if(route.endsWith('/policy'))r=Rewards.updatePolicy(d,b);else if(route.endsWith('/payment')){Payouts.unreserved(d,b.memberId);r=Rewards.payment(d,b,who);}else{const entry=d.rewards?.[b.kind==='grant'?'grants':'payments']?.find(x=>x.id===b.id);if(entry)Payouts.unreserved(d,entry.memberId);if(b.kind==='payment'&&(d.payoutJobs||[]).some(j=>j.paymentId===b.id&&j.status==='confirmed'))throw error(409,'Confirmed on-chain payments cannot be voided here.');r=Rewards.voidEntry(d,b,who);}}
         audit(d,who,'rewards.'+route.split('/').pop(),r.id,{amountCents:r.amountCents||null});return r;
       });return send(res,201,{id:result.id});
     }
@@ -204,7 +213,7 @@ async function createApp(options={}) {
     if(req.method==='POST'&&route==='/api/activities'){
       throttle('activity:'+member.id,30,60000);const b=await readBody(req),input=activityInput(b);
       if(typeof b.requestKey!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(b.requestKey))throw error(400,'Refresh the activity form and try again.');
-      const result=await store.transaction(d=>{const who=actor(req,d);if(!Wallet.validWallet(who.walletAddress))throw error(400,'Save your Solana wallet in Edit profile before submitting work.');const source=Channels.approvedSource(who,{...b,platform:input.platform});const payload={...input,...Rewards.quote(d,b),memberId:who.id,sourceId:source.id,sourceUrl:source.url};const hash=fingerprint(payload);
+      const result=await store.transaction(d=>{const who=actor(req,d);if(!Wallet.validWallet(who.walletAddress))throw error(400,'Save your Solana wallet in Edit profile before submitting work.');const prior=d.activities.find(a=>a.memberId===who.id&&a.requestKey===b.requestKey);if(prior){if(prior.fingerprint!==fingerprint({...input,memberId:who.id,sourceId:b.sourceId,campaignId:b.campaignId}))throw error(409,'This submission was already used. Open a new form.');return {activity:prior,duplicate:true};}const source=Channels.approvedSource(who,{...b,platform:input.platform});const campaign=Campaigns.source(d,who,{...b,platform:input.platform});const payload={...input,...Rewards.quote(d,b),memberId:who.id,sourceId:source.id,sourceUrl:source.url,campaignId:campaign.id,campaignTitle:campaign.title};const hash=fingerprint(payload);
         const existing=d.activities.find(a=>a.memberId===who.id&&a.requestKey===b.requestKey);
         if(existing){if(existing.fingerprint!==hash)throw error(409,'This submission was already used. Open a new form.');return {activity:existing,duplicate:true};}
         const duplicate=d.activities.find(a=>a.memberId===who.id&&(a.fingerprint===hash||(input.link&&a.link===input.link)));
@@ -223,14 +232,14 @@ async function createApp(options={}) {
           if(!['approved','rejected'].includes(b.status))throw error(400,'Invalid review.');
           const note=String(b.note||'').trim();if(note.length>300||b.status==='rejected'&&note.length<3)throw error(400,'Give a short reason for rejection (3–300 characters).');
           Object.assign(a,{status:b.status,reviewNote:note,reviewedBy:who.name,reviewedAt:new Date().toISOString()});
-          if(b.status==='approved'){if(a.sourceId)Channels.approvedSource(d.members.find(m=>m.id===a.memberId),a);const grant=Rewards.award(d,a,b,who);if(grant)a.rewardGrantId=grant.id;}
+          if(b.status==='approved'){if(a.campaignId)a.qualityScores=Campaigns.quality(b);if(a.sourceId)Channels.approvedSource(d.members.find(m=>m.id===a.memberId),a);const grant=Rewards.award(d,a,b,who);if(grant)a.rewardGrantId=grant.id;}
           audit(d,who,'activity_'+b.status,a.id,{note});
         }else{
           if(a.memberId!==who.id)throw error(403,'Only the author can correct this work.');
           if(a.status==='approved')throw error(409,'Approved work is locked.');
-          const source=Channels.approvedSource(who,{...b,platform:activityInput(b).platform});if(['none','custom'].includes(b.rewardType||'none'))delete a.rewardQuote;const input=activityInput(b),hash=fingerprint({...input,memberId:who.id,sourceId:source.id});
+          const source=Channels.approvedSource(who,{...b,platform:activityInput(b).platform});const campaign=Campaigns.source(d,who,{...b,platform:activityInput(b).platform},a.id);if(['none','custom'].includes(b.rewardType||'none'))delete a.rewardQuote;const input=activityInput(b),hash=fingerprint({...input,memberId:who.id,sourceId:source.id,campaignId:campaign.id});
           if(d.activities.some(x=>x.id!==a.id&&x.memberId===who.id&&(x.fingerprint===hash||(input.link&&x.link===input.link))))throw error(409,'This work is already recorded.');
-          Object.assign(a,input,Rewards.quote(d,b,a),{sourceId:source.id,sourceUrl:source.url,fingerprint:hash,status:'pending',reviewNote:'',reviewedBy:null,reviewedAt:null,updatedAt:new Date().toISOString()});audit(d,who,'activity_corrected',a.id);
+          Object.assign(a,input,Rewards.quote(d,b,a),{sourceId:source.id,sourceUrl:source.url,campaignId:campaign.id,campaignTitle:campaign.title,fingerprint:hash,status:'pending',reviewNote:'',reviewedBy:null,reviewedAt:null,updatedAt:new Date().toISOString()});audit(d,who,'activity_corrected',a.id);
         }
         a.history.push(before);a.version++;return a;});return send(res,200,{activity:result});
     }
@@ -243,7 +252,7 @@ async function createApp(options={}) {
       if(url.pathname.startsWith('/api/'))return await api(req,res,url);
       if(url.pathname==='/health'&&req.method==='GET')return send(res,200,{ok:true,build:BUILD});
       if(!['GET','HEAD'].includes(req.method))throw error(405,'Method not allowed.');
-      const assets={'/assets/seven-logo.png':['seven-logo.png','image/png'],'/assets/contributions.js':['contributions.js','text/javascript; charset=utf-8']};
+      const assets={'/assets/languages.js':['languages.js','text/javascript; charset=utf-8'],'/assets/solana-web3.js':['solana-web3.js','text/javascript; charset=utf-8'],'/assets/seven-logo.png':['seven-logo.png','image/png'],'/assets/contributions.js':['contributions.js','text/javascript; charset=utf-8']};
       if(assets[url.pathname]){const [file,type]=assets[url.pathname];const bytes=await fs.readFile(path.join(__dirname,'assets',file));res.writeHead(200,{'Content-Type':type,'X-Content-Type-Options':'nosniff','Cache-Control':'public, max-age=3600'});return res.end(req.method==='HEAD'?undefined:bytes);}
       if(!['/','/index.html'].includes(url.pathname))throw error(404,'Not found.');
       res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'same-origin','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':`default-src 'self'; script-src 'self' ${scripts}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'`});res.end(req.method==='HEAD'?undefined:html);
