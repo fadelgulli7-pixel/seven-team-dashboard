@@ -1,3 +1,12 @@
+نووکرنا پاراستنێ v5.5.1
+
+ئەڤ ڤێرژنە ل جهێ v5.5 بار بکە. هەمی فایلان نوو بکە، ب تایبەتی lib/token.js و package.json و package-lock.json.
+Build: npm ci
+Start: node server.js
+DATA_DIR و داتایێن تە ژێ مەبە.
+پشتی Deploy لینکێ /health ڤەکە؛ دڤێت build ب v5.5.1 دووماهی بهێت.
+سەرەتا دگەل چەند ئەندامەکێن ناسکری تاسکەکێ ژ دەستپێکێ حەتا پەسەندکرنێ تاقی بکە، پاشی بانگهێشتنا گشتی بکە.
+
 SEVEN Marketing v5.5
 
 ١. فایلێ ZIP ڤەکە و هەمی فایلێن سەرڤەری و index.html و پوشەیێن assets و lib ل GitHub نوو بکە.

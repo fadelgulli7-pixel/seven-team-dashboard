@@ -1,3 +1,13 @@
+# v5.5.1 security maintenance — 2026-10-17
+
+Use this full replacement instead of v5.5.0. Current npm production audit: 0 known advisories (previously 9 affected packages, 3 high and 6 moderate, from three dependency roots). This is a point-in-time dependency report, not a guarantee against vulnerabilities.
+
+Removed @solana/spl-token and its native bigint-buffer dependency chain. The narrowly scoped classic SPL Token module in lib/token.js validates the standard 82-byte initialized mint account, derives the ATA, and creates only the idempotent ATA and TransferChecked instructions needed by this application. Eight independent official SDK 0.4.14 fixture cases verify identical PDA addresses, instruction bytes, program IDs, signer and writable flags, including u64 boundary amounts. Invalid mint owner/size/state and invalid amounts fail closed. No Token-2022 support is added. Full signed-payment reservation/reconciliation tests pass.
+
+The jayson dependency is pinned to 5.0.0 via an explicit override to remove affected stream-json and uuid dependencies. A real localhost HTTP JSON-RPC request verifies web3.js compatibility. Lockfile is included. npm ci is verified, and startup/check/tests pass. The existing browser web3.js 1.98.4 asset is unchanged; npm audit reports the installed Node dependency tree, not a separate browser bundle audit.
+
+Production read-only checks observed build 2026-10-17-marketing-v5.5.0 and HTTP 401 for anonymous /api/me. This confirms the older version is deployed, not that production is fully audited. No production changes, real payouts or exhaustive penetration test were performed. Upload all files including lib/token.js, package.json and package-lock.json; preserve DATA_DIR and existing records. Verify /health reports v5.5.1 after Render deploy.
+
 # SEVEN Marketing v5.5
 
 This release updates the existing v5.4 dashboard. Upload the full source tree; keep the existing DATA_DIR persistent disk and team-data.json. Build with npm ci, start with node server.js. Do not upload a local data folder.
