@@ -1,16 +1,34 @@
-SEVEN Family 3.1.0 — 2026-10-13
-Runtime: Node v24.19.0
-npm test: PASS, 13 tests, 0 failures.
+SEVEN Marketing Team 5.2 — 2026-10-17
+Node v24.19.0
+npm test: PASS — 42 tests, 0 failures.
 npm run check: PASS.
 
-Covered: login/setup access control, CSRF and origin protection, review ownership,
-concurrent submissions, approval/rejection/correction, role/password/session controls,
-storage locking and atomic writes, invalid data protection, recovery,
-inline JavaScript syntax and CSP hashes, authenticated profile name/photo updates,
-photo persistence and asset delivery, approved-only contribution percentages,
-shared ranks, zero-contribution members, frontend summary rendering and escaping.
+Includes all previous account, recovery, review, atomic persistence, budget,
+privacy and fixed-ledger tests, plus:
+- Server-calculated effort/hourly pricing and a Telegram price lower than X.
+- Telegram submissions cannot take the X rate; existing v5 quotes remain frozen.
+- Legacy five-type reward policies upgrade without changing old grants/payments.
+- A verified $100 purchase earns exactly $5; a pending claim earns zero.
+- Verified net purchase value, rather than a claimant's assertion, sets commission.
+- Self-review, known self-referral, missing verification and reused orders/receipts blocked.
+- Reversals preserve the used order and original audit record.
+- Purchase receipt URLs, raw order IDs and buyer references excluded from ordinary-member APIs.
+- Referral commissions are separate from task weekly caps, with the shared unpaid cap enforced.
 
-Visual/browser limitation: Playwright could not launch because Chromium was absent.
-Downloading Chromium failed in this environment. No successful browser visual QA
-or full browser image-picker test is claimed. Mobile/desktop/RTL styling is implemented
-but should be visually checked on the deployed site. Live Render was not changed.
+Limits: no real-browser visual run was possible because Chromium could not be
+installed. No production site/data, payment provider or wallet was changed.
+Purchase verification is manual by a trusted reviewer; a URL/screenshot is not
+an automatic proof of settled payment. Time estimates are proposed planning
+assumptions, not a completed scientific measurement study. The app does not
+automatically detect refund events or identity aliases across different receipts.
+
+Wallet payout checks (5.2):
+- Required new-account/profile wallet with base58/32-byte/on-curve validation.
+- Historical wallet-less profiles remain readable; new work requires completion.
+- Other members cannot read wallet addresses; Owner can view all.
+- Non-Owner and stale revision transfer requests are rejected.
+- Active saved recipients with unpaid rewards only; SEVEN mint configuration required.
+- Transfer link contains explicit SPL mint, exact decimal amount and saved recipient.
+- Invalid precision, scientific notation, zero and out-of-range token quantities rejected.
+- Preparing a transfer never mutates earnings, due, payments or audit ledger.
+- No real SEVEN mint was verified, no wallet launch or token transfer was executed.

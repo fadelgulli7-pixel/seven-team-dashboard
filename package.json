@@ -1,12 +1,12 @@
 {
   "name": "seven-team-dashboard",
-  "version": "4.1.0",
+  "version": "5.2.0",
   "private": true,
-  "description": "SEVEN Network Marketing Team: approved contributions, transparent 20% revenue shares and private account recovery",
+  "description": "SEVEN Marketing Team: reviewed fixed task rewards, budget controls and private recovery",
   "scripts": {
     "start": "node server.js",
     "test": "node --test test/*.test.js",
-    "check": "node --check server.js && node --check tools.js && node --check lib/store.js && node --check lib/security.js && node --check lib/profile.js && node --check assets/contributions.js && node --check lib/treasury.js && node --check lib/recovery.js"
+    "check": "node --check server.js && node --check tools.js && node --check lib/store.js && node --check lib/security.js && node --check lib/wallet.js && node --check lib/profile.js && node --check assets/contributions.js && node --check lib/legacy-treasury.js && node --check lib/recovery.js && node --check lib/rewards.js"
   },
   "engines": {
     "node": ">=22.13.0"

@@ -4,22 +4,24 @@ const fs=require('node:fs/promises');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const {FileStore}=require('./lib/store');
-const Treasury=require('./lib/treasury');
+const Rewards=require('./lib/rewards');
+const Wallet=require('./lib/wallet');
 const Recovery=require('./lib/recovery');
 const {validPhoto}=require('./lib/profile');
 const {hashPassword,verifyPassword,equalSecret,Limiter}=require('./lib/security');
 const categories=['Marketing','Content','Community','Partnership','Development','Other'];
-const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Other'];
-const BUILD='2026-10-17-marketing-v4.1.0';
+const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Facebook','Other'];
+const BUILD='2026-10-17-marketing-v5.2.0';
 const TTL=12*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
-const safeMember=m=>({...Object.fromEntries(['id','name','handle','username','role','initials','createdAt','active','mustChangePassword','photo'].map(k=>[k,m[k]])),recoveryReady:!!m.recovery&&Date.parse(m.recovery.expiresAt)>Date.now()});
+const safeMember=(m,viewer=m)=>({...Object.fromEntries(['id','name','handle','username','role','initials','createdAt','active','mustChangePassword','photo'].map(k=>[k,m[k]])),hasWallet:!!m.walletAddress,...(viewer.id===m.id||viewer.role==='Owner'?{walletAddress:m.walletAddress||''}:{}),recoveryReady:!!m.recovery&&Date.parse(m.recovery.expiresAt)>Date.now()});
 const validPassword=p=>typeof p==='string'&&p.length>=12&&p.length<=200;
 function memberInput(body) {
   if(typeof body.name!=='string'||body.name.trim().length<2||body.name.trim().length>50||typeof body.username!=='string'||!/^[a-zA-Z0-9_.-]{3,32}$/.test(body.username)||!validPassword(body.password))throw error(400,'Enter a name, a valid username, and a password of 12–200 characters.');
+  if(!Wallet.validWallet(body.walletAddress))throw error(400,'Enter a valid Solana receiving wallet address.');
   const name=body.name.trim(),username=body.username.toLowerCase();
-  return {id:crypto.randomUUID(),name,username,handle:'@'+String(body.handle||username).trim().replace(/^@+/,'').slice(0,40),initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),createdAt:new Date().toISOString(),active:true,authVersion:0};
+  return {id:crypto.randomUUID(),walletAddress:body.walletAddress,name,username,handle:'@'+String(body.handle||username).trim().replace(/^@+/,'').slice(0,40),initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),createdAt:new Date().toISOString(),active:true,authVersion:0};
 }
 function activityInput(body) {
   const title=typeof body.title==='string'?body.title.trim():'';
@@ -54,7 +56,7 @@ async function createApp(options={}) {
   const dummy=await hashPassword(crypto.randomBytes(32).toString('hex'));
   const store=options.store||await new FileStore(path.resolve(dataDir)).open();
   const sessions=new Map(),limiter=new Limiter();
-  const treasury=options.treasury||Treasury.createTreasury();
+
   let cryptoJobs=0;
   async function cryptoWork(fn){if(cryptoJobs>=8)throw error(429,'Service is busy. Try again shortly.');cryptoJobs++;try{return await fn();}finally{cryptoJobs--;}}
   function secure(req){return req.socket.encrypted||env.NODE_ENV==='production'||req.headers['x-forwarded-proto']==='https';}
@@ -141,20 +143,35 @@ async function createApp(options={}) {
       const name=typeof b.name==='string'?b.name.trim():'';
       if(name.length<2||name.length>50)throw error(400,'Use a name of 2–50 characters.');
       if(typeof b.photo!=='string'||(b.photo!==''&&!validPhoto(b.photo)))throw error(400,'Choose a JPEG photo smaller than 100 KB.');
-      const updated=await store.transaction(d=>{const who=actor(req,d);Object.assign(who,{name,initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),photo:b.photo});audit(d,who,'profile_updated',who.id);return who;});
+      if(!Wallet.validWallet(b.walletAddress))throw error(400,'Enter a valid Solana receiving wallet address.');
+      const updated=await store.transaction(d=>{const who=actor(req,d);Object.assign(who,{walletAddress:b.walletAddress,name,initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),photo:b.photo});audit(d,who,'profile_updated',who.id);return who;});
       return send(res,200,{member:safeMember(updated)});
     }
-    if(req.method==='GET'&&route==='/api/finance'){const state=await treasury();return send(res,200,{revision:store.data.revision,...Treasury.summary(store.data,state)});}
-    if(req.method==='POST'&&['/api/finance/settle','/api/finance/payment','/api/finance/void'].includes(route)){
-      owner(actor(req));const b=await readBody(req);const state=route.endsWith('/settle')?await treasury():null;
-      const result=await store.transaction(d=>{const m=actor(req,d);owner(m);const r=route.endsWith('/settle')?Treasury.settle(d,state,b,m):route.endsWith('/payment')?Treasury.payment(d,b,m):Treasury.voidPayment(d,b,m);audit(d,m,'finance.'+route.split('/').pop(),r.id,{assetId:r.assetId,raw:r.raw});return r;});
-      return send(res,201,{id:result.id});
+    if(route==='/api/finance'||route.startsWith('/api/finance/'))throw error(410,'Revenue sharing has been retired.');
+    const rewardView=()=>{const view=Rewards.summary(store.data);if(member.role!=='Owner')view.payments=view.payments.map(p=>Object.fromEntries(['id','memberId','amountCents','currency','createdAt','voidedAt'].map(k=>[k,p[k]])));if(!['Owner','Manager'].includes(member.role))view.referrals=view.referrals.filter(c=>c.memberId===member.id).map(c=>Object.fromEntries(['id','memberId','claimedUsdCents','verifiedUsdCents','commissionCents','status','createdAt','confirmedAt','reviewNote','reversalReason'].map(k=>[k,c[k]])));return view;};
+    if(req.method==='POST'&&route==='/api/rewards/prepare-transfer'){
+      owner(member);const b=await readBody(req);const d=store.data;owner(actor(req,d));
+      if(b.revision!==d.revision)throw error(409,'This record changed. Refresh and try again.');
+      const recipient=d.members.find(m=>m.id===b.memberId);
+      if(!recipient||!recipient.active)throw error(400,'Choose an active member.');
+      if(!Rewards.summary(d).members.some(m=>m.memberId===b.memberId&&m.dueCents>0))throw error(400,'This member has no unpaid reward.');
+      return send(res,200,Wallet.transfer(recipient.walletAddress,b.amount,env));
     }
+    if(req.method==='GET'&&route==='/api/rewards')return send(res,200,rewardView());
     if(req.method==='GET'&&route==='/api/workspace'){
-      const state=await treasury();const who=actor(req);const d=store.data;
-      return send(res,200,{member:safeMember(who),members:d.members.map(safeMember),activities:d.activities.map(({history,fingerprint,requestKey,...a})=>a),revision:d.revision,build:BUILD,finance:Treasury.summary(d,state)});
+      const d=store.data;
+      return send(res,200,{member:safeMember(member),members:d.members.map(m=>safeMember(m,member)),activities:d.activities.map(({history,fingerprint,requestKey,...a})=>a),revision:d.revision,build:BUILD,rewards:rewardView()});
     }
-    if(req.method==='GET'&&route==='/api/data')return send(res,200,{member:safeMember(member),members:store.data.members.map(safeMember),activities:store.data.activities.map(({history,fingerprint,requestKey,...a})=>a),revision:store.data.revision,build:BUILD});
+    if(req.method==='POST'&&['/api/rewards/policy','/api/rewards/payment','/api/rewards/void','/api/rewards/award','/api/rewards/referral','/api/rewards/referral-review'].includes(route)){
+      const b=await readBody(req);const result=await store.transaction(d=>{const who=actor(req,d);if(b.revision!==d.revision)throw error(409,'This record changed. Refresh and try again.');let r;
+        if(route.endsWith('/referral')){throttle('referral-claim:'+who.id,20,60000);r=Rewards.claimReferral(d,b,who);}
+        else if(route.endsWith('/referral-review')){r=Rewards.reviewReferral(d,b,who);}
+        else if(route.endsWith('/award')){const a=d.activities.find(a=>a.id===b.activityId);if(!a)throw error(404,'Activity not found.');if(b.version!==a.version)throw error(409,'This record changed. Refresh and try again.');r=Rewards.award(d,a,b,who);if(!r)throw error(400,'Choose a paid reward type.');}
+        else{owner(who);r=route.endsWith('/policy')?Rewards.updatePolicy(d,b):route.endsWith('/payment')?Rewards.payment(d,b,who):Rewards.voidEntry(d,b,who);}
+        audit(d,who,'rewards.'+route.split('/').pop(),r.id,{amountCents:r.amountCents||null});return r;
+      });return send(res,201,{id:result.id});
+    }
+    if(req.method==='GET'&&route==='/api/data')return send(res,200,{member:safeMember(member),members:store.data.members.map(m=>safeMember(m,member)),activities:store.data.activities.map(({history,fingerprint,requestKey,...a})=>a),revision:store.data.revision,build:BUILD});
     if(req.method==='GET'&&route==='/api/audit'){owner(member);return send(res,200,{events:store.data.audit.slice(-200).reverse()});}
     if(req.method==='POST'&&route==='/api/backup'){
       owner(member);const b=await readBody(req);throttle('backup:'+member.id,3);
@@ -179,7 +196,7 @@ async function createApp(options={}) {
     if(req.method==='POST'&&route==='/api/activities'){
       throttle('activity:'+member.id,30,60000);const b=await readBody(req),input=activityInput(b);
       if(typeof b.requestKey!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(b.requestKey))throw error(400,'Refresh the activity form and try again.');
-      const result=await store.transaction(d=>{const who=actor(req,d);const payload={...input,memberId:who.id};const hash=fingerprint(payload);
+      const result=await store.transaction(d=>{const who=actor(req,d);if(!Wallet.validWallet(who.walletAddress))throw error(400,'Save your Solana wallet in Edit profile before submitting work.');const payload={...input,...Rewards.quote(d,b),memberId:who.id};const hash=fingerprint(payload);
         const existing=d.activities.find(a=>a.memberId===who.id&&a.requestKey===b.requestKey);
         if(existing){if(existing.fingerprint!==hash)throw error(409,'This submission was already used. Open a new form.');return {activity:existing,duplicate:true};}
         const duplicate=d.activities.find(a=>a.memberId===who.id&&(a.fingerprint===hash||(input.link&&a.link===input.link)));
@@ -198,13 +215,14 @@ async function createApp(options={}) {
           if(!['approved','rejected'].includes(b.status))throw error(400,'Invalid review.');
           const note=String(b.note||'').trim();if(note.length>300||b.status==='rejected'&&note.length<3)throw error(400,'Give a short reason for rejection (3–300 characters).');
           Object.assign(a,{status:b.status,reviewNote:note,reviewedBy:who.name,reviewedAt:new Date().toISOString()});
+          if(b.status==='approved'){const grant=Rewards.award(d,a,b,who);if(grant)a.rewardGrantId=grant.id;}
           audit(d,who,'activity_'+b.status,a.id,{note});
         }else{
           if(a.memberId!==who.id)throw error(403,'Only the author can correct this work.');
           if(a.status==='approved')throw error(409,'Approved work is locked.');
-          const input=activityInput(b),hash=fingerprint({...input,memberId:who.id});
+          if((b.rewardType||'none')==='none')delete a.rewardQuote;const input=activityInput(b),hash=fingerprint({...input,memberId:who.id});
           if(d.activities.some(x=>x.id!==a.id&&x.memberId===who.id&&(x.fingerprint===hash||(input.link&&x.link===input.link))))throw error(409,'This work is already recorded.');
-          Object.assign(a,input,{fingerprint:hash,status:'pending',reviewNote:'',reviewedBy:null,reviewedAt:null,updatedAt:new Date().toISOString()});audit(d,who,'activity_corrected',a.id);
+          Object.assign(a,input,Rewards.quote(d,b,a),{fingerprint:hash,status:'pending',reviewNote:'',reviewedBy:null,reviewedAt:null,updatedAt:new Date().toISOString()});audit(d,who,'activity_corrected',a.id);
         }
         a.history.push(before);a.version++;return a;});return send(res,200,{activity:result});
     }
