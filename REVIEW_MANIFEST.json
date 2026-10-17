@@ -1,0 +1,231 @@
+{
+  "build": "2026-10-18-marketing-v5.6.1",
+  "note": "Inventory and byte hashes, not an assertion of exhaustive third-party code audit.",
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 63,
+      "sha256": "4031aded0f92c1105d98a8b39bc4fba8192019bdf584485118969de86f5a4c37"
+    },
+    {
+      "path": "DEPENDENCY_AUDIT.json",
+      "bytes": 362,
+      "sha256": "410125464966835bbb2418e8737f6a8f9aeb6e06379a9d181f40811b5ec17c0e"
+    },
+    {
+      "path": "MARKETING_POLICY_KU.txt",
+      "bytes": 6643,
+      "sha256": "11d8facbab5b605f2a6af57bc9f30c2e869e1efaf90e3a90aaa3cefa91ca26b3"
+    },
+    {
+      "path": "PRICING_AND_REFERRALS_KU.txt",
+      "bytes": 5101,
+      "sha256": "5c869488b21fbe4e5543245a32aa1f47b4b3ddfbdcc84a05de1d8a7f0e7b5930"
+    },
+    {
+      "path": "README.md",
+      "bytes": 30287,
+      "sha256": "002706855c1961010e98da18775c9e55cfbdd4c4d38a1b0983dd6b1c215554cb"
+    },
+    {
+      "path": "SECURITY_REVIEW.md",
+      "bytes": 3149,
+      "sha256": "196b1a6141ebe9e592fe41e3cc441f42be5ad08f957513a467b771cd94b3e006"
+    },
+    {
+      "path": "START_HERE_KU.txt",
+      "bytes": 1522,
+      "sha256": "8da4537bf8f0c12fe4fe65d79852ef63bc658851c2ad34b931e5682656156d90"
+    },
+    {
+      "path": "TEST_RESULTS.txt",
+      "bytes": 7059,
+      "sha256": "4b0243a444a9670556e3571b83f233f19e10de93a2599eed567f77968856a686"
+    },
+    {
+      "path": "TREASURY_GUIDE_KU.txt",
+      "bytes": 461,
+      "sha256": "efac2f41174cc06acf6825aeed30bb483930db849982cdde8b3f94d2ed8c41ed"
+    },
+    {
+      "path": "WALLET_PAYOUTS_KU.txt",
+      "bytes": 2168,
+      "sha256": "c2b41281f13cc222699efbef7ba4ed42a7ca84c4f2087b330886887f7fc0ff92"
+    },
+    {
+      "path": "assets/SOLANA-WEB3-LICENSE.txt",
+      "bytes": 1060,
+      "sha256": "c181f3e6911f515d2b5d18513f8e24fba252c36856978fa80b01249fa813453f"
+    },
+    {
+      "path": "assets/contributions.js",
+      "bytes": 902,
+      "sha256": "ecbbb395af5f5ed3bf891b4586120ce478e7edc8cce4f4009bbd2cdae1f587c0"
+    },
+    {
+      "path": "assets/languages.js",
+      "bytes": 243577,
+      "sha256": "773696f4a92a1b4d667f187d76529d0be1502b1c0995e2af2034645ecd0653ef"
+    },
+    {
+      "path": "assets/seven-logo.png",
+      "bytes": 2249491,
+      "sha256": "76d1088d8740bfbde995885a8825a2e0649cdbfcecae661cebc50cbdd55133ad"
+    },
+    {
+      "path": "assets/solana-web3.js",
+      "bytes": 463860,
+      "sha256": "09cdbea951b2ed0e11bcbe3aeb1ee9f035f9fb51ed212aca645475ae82688cc3"
+    },
+    {
+      "path": "assets/wallets.js",
+      "bytes": 1719,
+      "sha256": "4da9a99a445ec46e80dee9ff7baba93b8c3cda6d25cc933e98c769dd89c8fe84"
+    },
+    {
+      "path": "index.html",
+      "bytes": 210699,
+      "sha256": "a078df264032f1e71b73fe834c4a8d0371d175cd8aa79effd756e612db99e4a6"
+    },
+    {
+      "path": "lib/campaigns.js",
+      "bytes": 3875,
+      "sha256": "c61f549c14a49a835bf9716a3be416181dde6d465c71b9b8c971c1fab8ffe8c5"
+    },
+    {
+      "path": "lib/channels.js",
+      "bytes": 3974,
+      "sha256": "0d9c2e474a33de381c5ad7cbb2ab3bd2528a026f4a749bb4a5cf3b0c6458920c"
+    },
+    {
+      "path": "lib/legacy-treasury.js",
+      "bytes": 2588,
+      "sha256": "ff9338b1076f0866d9a7308d25b086db8bf18ed244910d08c12cf5491dabc797"
+    },
+    {
+      "path": "lib/payouts.js",
+      "bytes": 9086,
+      "sha256": "3bfc58e6053af87df42361e3b95420cd9ea9ceb6babee208b0769d8bcc890eef"
+    },
+    {
+      "path": "lib/profile.js",
+      "bytes": 352,
+      "sha256": "c67fd8b926c4ff711701f85a38ab7f145ccb8324cfa275e8b320a4aa35981beb"
+    },
+    {
+      "path": "lib/recovery.js",
+      "bytes": 881,
+      "sha256": "2fb779020f14e25656ceee7df1c6c88f6633b1383c087f2ab03258ae714570f9"
+    },
+    {
+      "path": "lib/rewards.js",
+      "bytes": 20314,
+      "sha256": "1dff03ba0d86c76e9ae98abd337bf763e4fe746b63469e6f6e426cc47b81949f"
+    },
+    {
+      "path": "lib/security.js",
+      "bytes": 1983,
+      "sha256": "2b648d8cee2b33f2e1ee7a5d8daf64ab795858c07396eb36341062e3cdb284b3"
+    },
+    {
+      "path": "lib/store.js",
+      "bytes": 11496,
+      "sha256": "4abf2bdf6f17b8f7ea9cc1778fd544d3fe3663b7cb052015d40b9f2317f50d6a"
+    },
+    {
+      "path": "lib/token.js",
+      "bytes": 2358,
+      "sha256": "da90e384119d6395b0bd031b1fb3123a1d288a2ffde8edd81228cf3ef27463a7"
+    },
+    {
+      "path": "lib/treasury.js",
+      "bytes": 138,
+      "sha256": "97a038ac66d7353934da549916d4aa60bd916e26599b82245cd6eb4a029d304a"
+    },
+    {
+      "path": "lib/wallet.js",
+      "bytes": 2088,
+      "sha256": "631379087156aefb018459c14440b12b9bcf30eabc2d14383b9d8dc203410685"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 35760,
+      "sha256": "f2948f88b9db80719cbf0c37891996a83e90b5fc93fc46aff740eb54f792948f"
+    },
+    {
+      "path": "package.json",
+      "bytes": 986,
+      "sha256": "2e41abb8ddb734cca6e9dc35289d5790b76ba2455b721f46adf5758c3645032a"
+    },
+    {
+      "path": "server.js",
+      "bytes": 30225,
+      "sha256": "8fb77d34b2c0295b3806f7d6791b4413f4bba145ef2c0c61df8866566de16dc3"
+    },
+    {
+      "path": "test/app.test.js",
+      "bytes": 35710,
+      "sha256": "b5e1582f0167cff1120f6afecc837d83a3795caed9f2ce140d310e0c56e70739"
+    },
+    {
+      "path": "test/channels.test.js",
+      "bytes": 8003,
+      "sha256": "0d9d0302a0245ed5b336de2fb9c8ba3cf3a553984d0ab3c6687ac5775f0dd9df"
+    },
+    {
+      "path": "test/fixtures/avatar.jpg",
+      "bytes": 644,
+      "sha256": "550fb6bd2c3049bba38e50904754800be060525b146f25a5d0b7ebbeb2731606"
+    },
+    {
+      "path": "test/fixtures/token-sdk-0.4.14.json",
+      "bytes": 16808,
+      "sha256": "9eb798512f8d6ccf7ea064d9e168d5bc61ac32843fc5c1f1c8ab91cbacd556a0"
+    },
+    {
+      "path": "test/languages.test.js",
+      "bytes": 2354,
+      "sha256": "c0ff7a000886f2667d2400078587c0342fc29049b2d415059a6ce26e09e09cfb"
+    },
+    {
+      "path": "test/payout-ui.test.js",
+      "bytes": 1987,
+      "sha256": "2ca779c0a99e0013be788bf562780cc656a74a3d433f70e7699835aa5c433816"
+    },
+    {
+      "path": "test/payouts.test.js",
+      "bytes": 12312,
+      "sha256": "9f5e20ba975b6550129e0653b77373d434395942d5a65418a81b984a77320077"
+    },
+    {
+      "path": "test/rewards.test.js",
+      "bytes": 9412,
+      "sha256": "7de9dc91742adcba2c6d28670b66359e452f3ffecf435aa0c736a35066ff1a78"
+    },
+    {
+      "path": "test/token-security.test.js",
+      "bytes": 2227,
+      "sha256": "778e20ac8c1e5074738fa4e06d0e5afcbaad1c583cb5deba947eea26a6edcb58"
+    },
+    {
+      "path": "test/treasury.test.js",
+      "bytes": 1122,
+      "sha256": "37070ace35072595cc3b9f1e0f3e1b65c4b2af92ca27dec6bbe7b762baabab56"
+    },
+    {
+      "path": "test/wallets.test.js",
+      "bytes": 3035,
+      "sha256": "e77a0ad33a611689cfd38bb4cdb9a0376ed6085e7c7e897674308514d4ec467f"
+    },
+    {
+      "path": "test/workflow55.test.js",
+      "bytes": 3513,
+      "sha256": "29a61e59f8e48d5acad63d13c9c77b2cbd60064435e1bda2a2fdd36cbf72c9f8"
+    },
+    {
+      "path": "tools.js",
+      "bytes": 2075,
+      "sha256": "14857a722beb769757d4660f8d11d0265907586af050d687696299b4397ecdcd"
+    }
+  ]
+}

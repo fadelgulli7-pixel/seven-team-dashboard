@@ -1,3 +1,14 @@
+# Current review — 5.6.1
+
+Reviewed application areas: HTTP authorization and CSRF, auth/recovery/session persistence, atomic storage and backup protections, profile privacy, page/campaign review, rewards and referral ledger, Solana token construction, wallet adapters, browser/server serialization, payout reservation/signature/broadcast/reconciliation, locale error handling, static asset routing and CSP. Historical treasury code remains a validation-only compatibility shim.
+
+Resolved: fixed fees in newly reserved messages, specific signed-validation errors, visible uncertain-status notices, and reconciliation before wallet signing. No signed-message relaxation. 66 tests passed; production dependency npm audit: zero known advisories. See README.md for detailed findings, evidence, legacy-job instructions and operational limitations.
+
+Mobile Phantom signed-validation root cause remains unconfirmed until the updated build is tested on the device; wallet automatic fee insertion is a documented compatibility risk addressed by the patch. Solflare site classification requires its support review. No production data or funds were touched.
+
+---
+Historical security review:
+
 # Security review — SEVEN Marketing 5.5.1
 
 ## Findings resolved

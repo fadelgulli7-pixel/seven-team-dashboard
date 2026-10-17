@@ -1,3 +1,34 @@
+# SEVEN Marketing v5.6.1 — payout validation review
+
+Build: `2026-10-18-marketing-v5.6.1`.
+
+## Current changes
+
+- New prepared payouts include fixed ComputeBudget limit (200,000 units) and price (10,000 micro-lamports/unit; 2,000 lamports priority fee). They are part of the exact reserved message before the wallet sees it. This addresses compatibility with wallets that automatically insert fee instructions when absent; it does not accept arbitrary changes to a signed transaction.
+- Decoding, source-wallet mismatch, changed message and invalid/missing signature now produce distinct owner-visible errors, localized in all six non-English interface dictionaries. The API also returns a bounded PAYOUT_* code.
+- The wallet dialog displays uncertain-broadcast notices instead of discarding them.
+- The dialog reconciles the same job before opening signing, so an expired unsigned payment is displayed as expired rather than signed again.
+- Old jobs and messages are preserved. For an old unsigned prepared job: Check payment status until expired, close, then prepare a new job. A broadcast/unknown job stays reserved and requires reconciliation; never create a second payment to work around it.
+
+## Investigation result and limits
+
+The supplied Phantom screenshot proves that signed validation rejected the submission. It does not identify which former combined check failed. Browser/server serialization was reproduced with the vendored browser SDK and locally generated real Ed25519 signatures: exact bytes and signature verification succeed. Wallet fee insertion is a plausible compatibility cause, based on Phantom's own published behavior, and is addressed in new preparations. It is not proven from the screenshot alone.
+
+Reference: https://github.com/orgs/phantom/discussions/203 (Phantom representative describes automatic priority fees when absent). Exact equality, signer verification, saved-before-broadcast signature, duplicate reservations and once-only ledger posting remain enforced.
+
+Solflare's domain security block is a separate external finding. This release does not remove or evade it. Ask official Solflare support to review the domain. No live payment, actual mobile-wallet test, production mutation or deployment was performed.
+
+## Validation
+
+66 automated tests pass. Includes the real local HTTP RPC compatibility test; browser-bundle round trip with genuine signatures; modeled conditional wallet fee insertion; refusal of changed transfer data, extra transfer, fee changes, different payer, missing/corrupt signature and unreadable bytes; legacy immutable message expiry; UI reconciliation-before-sign and visibility of uncertain notices. Chain/provider tests use mocks. All application JavaScript and the inline browser script parse successfully. Production Node dependency audit: zero known advisories at review time; this is not a blanket security certification or a separate audit of every vendored browser-library line.
+
+## Deploy
+
+Upload the complete ZIP contents to the existing repository, including assets and lib. Build `npm ci`; start `node server.js`. Keep the existing persistent DATA_DIR, team-data.json, sessions.json and backups. Check `/health` for the build above. No public/private keys or credentials should be pasted into source or chat.
+
+---
+Historical release notes:
+
 # SEVEN Marketing v5.6 — Solflare support
 
 The payout settings now explicitly select Solflare or Phantom. On mobile, the Connect button opens the chosen wallet's own browser through its official browse link. Log in to the panel there, connect the intended Solana account and save its public address. No new dependency or private-key storage is added.
