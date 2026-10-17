@@ -1,3 +1,22 @@
+# SEVEN Marketing v5.6 — Solflare support
+
+The payout settings now explicitly select Solflare or Phantom. On mobile, the Connect button opens the chosen wallet's own browser through its official browse link. Log in to the panel there, connect the intended Solana account and save its public address. No new dependency or private-key storage is added.
+
+Solflare connect may return a boolean or nothing, so the adapter reads provider.publicKey instead of assuming a Phantom-shaped response. False/rejected connections and account mismatches fail before signing. Only signTransaction is used: the server still compares exact reserved message bytes, verifies the signature, persists it before broadcast and reconciles once. The integration never silently uses a different wallet provider.
+
+Existing payout config is retained, including Phantom. Choose Solflare explicitly under Rewards > My payout wallet, press Connect Solflare and save. Previously reserved payments are not rewritten or cancelled by changing wallet settings. A prepared payment can be signed by either selected wallet only if it controls the same saved source public key. Broadcast/unknown results must be checked before any new payment. Switching wallet does not establish why an earlier transaction failed.
+
+Required upload: the entire source tree, especially assets/wallets.js, assets/languages.js, index.html, server.js and lib/payouts.js. Preserve DATA_DIR, team-data.json and sessions.json. Build npm ci; start node server.js. Health build: 2026-10-17-marketing-v5.6.0.
+
+Validation: 61 full-suite tests pass, plus focused adapter/locale regression checks; Solflare-like mocked provider signs a real locally generated Solana transaction and the server records exactly one confirmed ledger payment with a mocked chain. No actual mobile-wallet end-to-end transfer, live fund movement or production deployment was performed. A different wallet cannot guarantee resolution of an unknown RPC/network issue. Production npm audit is retained separately.
+
+Official integration references:
+https://docs.solflare.com/solflare/technical/deeplinks/other-methods/browse
+https://docs.solflare.com/solflare/technical/integrate-solflare/solflare-wallet-sdk
+
+---
+Historical release notes:
+
 # v5.5.1 security maintenance — 2026-10-17
 
 Use this full replacement instead of v5.5.0. Current npm production audit: 0 known advisories (previously 9 affected packages, 3 high and 6 moderate, from three dependency roots). This is a point-in-time dependency report, not a guarantee against vulnerabilities.

@@ -14,7 +14,7 @@ const {validPhoto}=require('./lib/profile');
 const {hashPassword,verifyPassword,equalSecret,Limiter}=require('./lib/security');
 const categories=['Marketing','Content','Community','Partnership','Development','Other'];
 const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Facebook','Other'];
-const BUILD='2026-10-17-marketing-v5.5.1';
+const BUILD='2026-10-17-marketing-v5.6.0';
 const TTL=30*24*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
@@ -53,7 +53,7 @@ async function createApp(options={}) {
   // Read required assets before acquiring the data-directory lock.
   const html=await fs.readFile(path.join(__dirname,'index.html'));
   // Refuse a partial upload before opening the persistent store.
-  for(const asset of ['seven-logo.png','contributions.js','languages.js','solana-web3.js']){
+  for(const asset of ['seven-logo.png','contributions.js','languages.js','solana-web3.js','wallets.js']){
     try{await fs.access(path.join(__dirname,'assets',asset));}
     catch{throw Error('Missing assets/'+asset+'. Upload the entire assets folder from the ZIP.');}
   }
@@ -260,7 +260,7 @@ async function createApp(options={}) {
       if(url.pathname.startsWith('/api/'))return await api(req,res,url);
       if(url.pathname==='/health'&&req.method==='GET')return send(res,200,{ok:true,build:BUILD});
       if(!['GET','HEAD'].includes(req.method))throw error(405,'Method not allowed.');
-      const assets={'/assets/languages.js':['languages.js','text/javascript; charset=utf-8'],'/assets/solana-web3.js':['solana-web3.js','text/javascript; charset=utf-8'],'/assets/seven-logo.png':['seven-logo.png','image/png'],'/assets/contributions.js':['contributions.js','text/javascript; charset=utf-8']};
+      const assets={'/assets/wallets.js':['wallets.js','text/javascript; charset=utf-8'],'/assets/languages.js':['languages.js','text/javascript; charset=utf-8'],'/assets/solana-web3.js':['solana-web3.js','text/javascript; charset=utf-8'],'/assets/seven-logo.png':['seven-logo.png','image/png'],'/assets/contributions.js':['contributions.js','text/javascript; charset=utf-8']};
       if(assets[url.pathname]){const [file,type]=assets[url.pathname];const bytes=await fs.readFile(path.join(__dirname,'assets',file));res.writeHead(200,{'Content-Type':type,'X-Content-Type-Options':'nosniff','Cache-Control':'public, max-age=3600'});return res.end(req.method==='HEAD'?undefined:bytes);}
       if(!['/','/index.html'].includes(url.pathname))throw error(404,'Not found.');
       res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'same-origin','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':`default-src 'self'; script-src 'self' ${scripts}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'`});res.end(req.method==='HEAD'?undefined:html);

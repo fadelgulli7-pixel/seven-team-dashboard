@@ -1,12 +1,12 @@
 {
   "name": "seven-team-dashboard",
-  "version": "5.5.1",
+  "version": "5.6.0",
   "private": true,
   "description": "SEVEN Marketing: reviewed campaigns, multilingual team workflow and owner-confirmed Phantom SEVEN payments",
   "scripts": {
     "start": "node server.js",
     "test": "node --test test/*.test.js",
-    "check": "node --check server.js && node --check tools.js && node --check lib/store.js && node --check lib/security.js && node --check lib/wallet.js && node --check lib/profile.js && node --check assets/contributions.js && node --check lib/legacy-treasury.js && node --check lib/recovery.js && node --check lib/rewards.js && node --check lib/channels.js && node --check lib/payouts.js && node --check lib/campaigns.js && node --check assets/languages.js && node --check lib/token.js"
+    "check": "node --check server.js && node --check tools.js && node --check lib/store.js && node --check lib/security.js && node --check lib/wallet.js && node --check lib/profile.js && node --check assets/contributions.js && node --check lib/legacy-treasury.js && node --check lib/recovery.js && node --check lib/rewards.js && node --check lib/channels.js && node --check lib/payouts.js && node --check lib/campaigns.js && node --check assets/languages.js && node --check lib/token.js && node --check assets/wallets.js"
   },
   "engines": {
     "node": ">=22.13.0"
