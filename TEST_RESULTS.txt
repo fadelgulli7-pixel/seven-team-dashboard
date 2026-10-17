@@ -1,34 +1,64 @@
-SEVEN Marketing Team 5.2 — 2026-10-17
-Node v24.19.0
-npm test: PASS — 42 tests, 0 failures.
-npm run check: PASS.
+SEVEN Marketing v5.3 — local validation
 
-Includes all previous account, recovery, review, atomic persistence, budget,
-privacy and fixed-ledger tests, plus:
-- Server-calculated effort/hourly pricing and a Telegram price lower than X.
-- Telegram submissions cannot take the X rate; existing v5 quotes remain frozen.
-- Legacy five-type reward policies upgrade without changing old grants/payments.
-- A verified $100 purchase earns exactly $5; a pending claim earns zero.
-- Verified net purchase value, rather than a claimant's assertion, sets commission.
-- Self-review, known self-referral, missing verification and reused orders/receipts blocked.
-- Reversals preserve the used order and original audit record.
-- Purchase receipt URLs, raw order IDs and buyer references excluded from ordinary-member APIs.
-- Referral commissions are separate from task weekly caps, with the shared unpaid cap enforced.
+45 tests passed, 0 failed (Node 24.19.0).
+Includes real HTTP/session/CSRF API tests, independent page approval, inactive-page rejection, stale decisions, contact validation, phone privacy, approved-source enforcement, owner-only exact-cent custom rewards, weekly caps and historical-store compatibility.
+All browser inline scripts parse. Browser rendering was not visually verified: local Chromium was unavailable and browser download failed. No production deployment or production data migration was executed here.
 
-Limits: no real-browser visual run was possible because Chromium could not be
-installed. No production site/data, payment provider or wallet was changed.
-Purchase verification is manual by a trusted reviewer; a URL/screenshot is not
-an automatic proof of settled payment. Time estimates are proposed planning
-assumptions, not a completed scientific measurement study. The app does not
-automatically detect refund events or identity aliases across different receipts.
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
 
-Wallet payout checks (5.2):
-- Required new-account/profile wallet with base58/32-byte/on-curve validation.
-- Historical wallet-less profiles remain readable; new work requires completion.
-- Other members cannot read wallet addresses; Owner can view all.
-- Non-Owner and stale revision transfer requests are rejected.
-- Active saved recipients with unpaid rewards only; SEVEN mint configuration required.
-- Transfer link contains explicit SPL mint, exact decimal amount and saved recipient.
-- Invalid precision, scientific notation, zero and out-of-range token quantities rejected.
-- Preparing a transfer never mutates earnings, due, payments or audit ledger.
-- No real SEVEN mint was verified, no wallet launch or token transfer was executed.
+> seven-team-dashboard@5.3.0 test
+> node --test test/*.test.js
+
+✔ password hashes are salted, bounded and verified; rate limits expire (2477.872064ms)
+✔ setup is protected and single-use; anonymous, CSRF and origin requests blocked (1105.858381ms)
+✔ missing or wrong setup token cannot create owner (258.294971ms)
+✔ member workflow, concurrent duplicates, rejection, correction, approval, stale version and suspension (3140.832158ms)
+✔ owner cannot self-approve and password reset revokes sessions (2606.134185ms)
+✔ serialized writes survive reopen; lock blocks second writer; failed write rolls back (270.138475ms)
+✔ corrupt, unknown-schema and missing initialized data fail closed without overwrite (74.430186ms)
+✔ HTML scripts parse and CSP matches actual inline bytes (701.393691ms)
+✔ production fails closed without explicit data path (0.926605ms)
+✔ maintenance backup verification and owner recovery preserve records and survive restart (1494.278475ms)
+✔ profile updates are authenticated, private to the member, persisted and validated (1871.825973ms)
+✔ rankings use approved work only, include everyone, share tied ranks and handle zero work (39.366333ms)
+✔ frontend summaries render real member names, all rows, percentages and safe text (97.877298ms)
+✔ single-use recovery is password-gated, hash-only, persisted, rotated and revokes all sessions (3788.831635ms)
+✔ recovery cannot bypass suspension, expiry or a later owner password reset (3749.78485ms)
+✔ workspace money and contributions share one revision and never leak recovery credentials (404.06144ms)
+✔ recovery codes are consumed atomically under concurrent requests (1121.777773ms)
+✔ recovery entry screens and fixed task reward amounts render without a wallet or revenue source (38.50966ms)
+✔ fixed reward workflow is atomic, private, budgeted and independent of the retired treasury (1522.532301ms)
+✔ policy control is owner-only; budget failure rolls back work approval; quoted prices stay fixed (1518.726803ms)
+✔ referral purchase API grants exactly five percent, protects receipts and rejects self review (2079.483826ms)
+✔ a Telegram submission cannot claim the X post price through the API (730.526019ms)
+✔ wallet ownership privacy, required profiles and owner-only SEVEN transfer preparation (1074.63841ms)
+✔ configured SEVEN links use the saved wallet and never mutate the payment ledger (1225.192477ms)
+✔ contacts, platform domains, independent activity review, rejection and stale versions (8.795407ms)
+✔ custom rewards require owner, exact cents, reason, independent review and existing caps (29.154243ms)
+✔ real API blocks unapproved sources, hides phone from peers and records owner custom reward (3323.503916ms)
+✔ four original social posts earn ten dollars, independently of income or a project wallet (51.5118ms)
+✔ pending work, self review, unverified quality and repeated evidence cannot earn money (5.051427ms)
+✔ canonical evidence normalizes tracking parameters, host and trailing slash (1.255422ms)
+✔ member, team, unpaid and task-type weekly caps are enforced without creating extra grants (10.087262ms)
+✔ submission prices survive policy changes and do not reprice earned work (4.357686ms)
+✔ payment cannot exceed earned cents; voiding preserves an auditable history (4.889315ms)
+✔ USD cents are exact and reject negative, fractional cents and unsafe numbers (5.625032ms)
+✔ weekly budgets use Monday in Baghdad, not the server timezone (1.195322ms)
+✔ old approvals have no automatic monetary value until an independent reward decision (2.645789ms)
+✔ a reviewer cannot silently change a submitted paid quote to an unpaid approval (1.920174ms)
+✔ effort-based pricing separates Telegram from X and is calculated on the server (0.584293ms)
+✔ v5 policy upgrade preserves old Telegram quotes, grants and budgets (3.410541ms)
+✔ verified $100 purchase earns exactly $5 only after independent confirmation (7.096162ms)
+✔ unverified purchases, self referral and duplicate orders or receipts cannot earn again (8.683619ms)
+✔ commission uses verified net value, rounds down to cents and rejects false attribution (4.609277ms)
+✔ reversal keeps the purchase used and audit records intact; shared unpaid cap never trims the five percent (5.667252ms)
+✔ an owner or manager cannot independently confirm their own referred purchase (5.466581ms)
+✔ historical treasury records stay readable without a live source or a wallet connector (34.054428ms)
+ℹ tests 45
+ℹ suites 0
+ℹ pass 45
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33122.332039

@@ -5,17 +5,18 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const {FileStore}=require('./lib/store');
 const Rewards=require('./lib/rewards');
+const Channels=require('./lib/channels');
 const Wallet=require('./lib/wallet');
 const Recovery=require('./lib/recovery');
 const {validPhoto}=require('./lib/profile');
 const {hashPassword,verifyPassword,equalSecret,Limiter}=require('./lib/security');
 const categories=['Marketing','Content','Community','Partnership','Development','Other'];
 const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Facebook','Other'];
-const BUILD='2026-10-17-marketing-v5.2.0';
+const BUILD='2026-10-17-marketing-v5.3.0';
 const TTL=12*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
-const safeMember=(m,viewer=m)=>({...Object.fromEntries(['id','name','handle','username','role','initials','createdAt','active','mustChangePassword','photo'].map(k=>[k,m[k]])),hasWallet:!!m.walletAddress,...(viewer.id===m.id||viewer.role==='Owner'?{walletAddress:m.walletAddress||''}:{}),recoveryReady:!!m.recovery&&Date.parse(m.recovery.expiresAt)>Date.now()});
+const safeMember=(m,viewer=m)=>({...Object.fromEntries(['id','name','handle','username','role','initials','createdAt','active','mustChangePassword','photo'].map(k=>[k,m[k]])),hasWallet:!!m.walletAddress,channels:m.channels||[],profileComplete:!!m.fullName&&!!m.phone,...(viewer.id===m.id||viewer.role==='Owner'?{fullName:m.fullName||'',phone:m.phone||''}:{}),...(viewer.id===m.id||viewer.role==='Owner'?{walletAddress:m.walletAddress||''}:{}),recoveryReady:!!m.recovery&&Date.parse(m.recovery.expiresAt)>Date.now()});
 const validPassword=p=>typeof p==='string'&&p.length>=12&&p.length<=200;
 function memberInput(body) {
   if(typeof body.name!=='string'||body.name.trim().length<2||body.name.trim().length>50||typeof body.username!=='string'||!/^[a-zA-Z0-9_.-]{3,32}$/.test(body.username)||!validPassword(body.password))throw error(400,'Enter a name, a valid username, and a password of 12–200 characters.');
@@ -32,7 +33,7 @@ function activityInput(body) {
   if(body.link){try{const u=new URL(body.link);if(!['https:','http:'].includes(u.protocol)||u.username||u.password||u.href.length>2048)throw Error();u.hash='';link=u.href;}catch{throw error(400,'Enter a valid http or https link.');}}
   return {title,category:body.category,platform:platforms.includes(body.platform)?body.platform:'Other',description,link};
 }
-function fingerprint(a){return crypto.createHash('sha256').update(JSON.stringify([a.memberId,a.title.toLowerCase(),a.category,a.platform,a.description,a.link])).digest('hex');}
+function fingerprint(a){return crypto.createHash('sha256').update(JSON.stringify([a.memberId,a.title.toLowerCase(),a.category,a.platform,a.description,a.link,a.sourceId])).digest('hex');}
 function audit(d,actor,action,target,details={}) {d.audit.push({id:crypto.randomUUID(),actorId:actor.id,actorName:actor.name,action,target,details,createdAt:new Date().toISOString()});}
 function send(res,status,value,headers={}){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff',...headers});res.end(JSON.stringify(value));}
 async function readBody(req,maxBytes=32768){
@@ -144,8 +145,15 @@ async function createApp(options={}) {
       if(name.length<2||name.length>50)throw error(400,'Use a name of 2–50 characters.');
       if(typeof b.photo!=='string'||(b.photo!==''&&!validPhoto(b.photo)))throw error(400,'Choose a JPEG photo smaller than 100 KB.');
       if(!Wallet.validWallet(b.walletAddress))throw error(400,'Enter a valid Solana receiving wallet address.');
-      const updated=await store.transaction(d=>{const who=actor(req,d);Object.assign(who,{walletAddress:b.walletAddress,name,initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),photo:b.photo});audit(d,who,'profile_updated',who.id);return who;});
+      const contact=Channels.contact(b);
+      const updated=await store.transaction(d=>{const who=actor(req,d);Object.assign(who,{...contact,walletAddress:b.walletAddress,name,initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),photo:b.photo});audit(d,who,'profile_updated',who.id);return who;});
       return send(res,200,{member:safeMember(updated)});
+    }
+    if(req.method==='POST'&&route==='/api/channels'){
+      const b=await readBody(req);const channel=await store.transaction(d=>{const who=actor(req,d);Channels.contact(who);const c=Channels.add(who,b);audit(d,who,'channel_submitted',c.id);return c;});return send(res,201,{channel});
+    }
+    if(req.method==='POST'&&route==='/api/channels/review'){
+      const b=await readBody(req);const channel=await store.transaction(d=>{const who=actor(req,d),target=d.members.find(m=>m.id===b.memberId);if(!target)throw error(404,'Member not found.');const c=Channels.review(target,b,who);audit(d,who,'channel_'+c.status,c.id,{memberId:target.id,note:c.note});return c;});return send(res,200,{channel});
     }
     if(route==='/api/finance'||route.startsWith('/api/finance/'))throw error(410,'Revenue sharing has been retired.');
     const rewardView=()=>{const view=Rewards.summary(store.data);if(member.role!=='Owner')view.payments=view.payments.map(p=>Object.fromEntries(['id','memberId','amountCents','currency','createdAt','voidedAt'].map(k=>[k,p[k]])));if(!['Owner','Manager'].includes(member.role))view.referrals=view.referrals.filter(c=>c.memberId===member.id).map(c=>Object.fromEntries(['id','memberId','claimedUsdCents','verifiedUsdCents','commissionCents','status','createdAt','confirmedAt','reviewNote','reversalReason'].map(k=>[k,c[k]])));return view;};
@@ -180,7 +188,7 @@ async function createApp(options={}) {
     }
     if(req.method==='POST'&&route==='/api/members'){
       owner(member);throttle('member-create:'+member.id,30);const b=await readBody(req);
-      const m={...memberInput(b),...await cryptoWork(()=>hashPassword(b.password)),role:b.role==='Manager'?'Manager':'Member',mustChangePassword:true};
+      const m={...memberInput(b),...Channels.contact(b),channels:[],...await cryptoWork(()=>hashPassword(b.password)),role:b.role==='Manager'?'Manager':'Member',mustChangePassword:true};
       await store.transaction(d=>{const who=actor(req,d);owner(who);if(d.members.some(x=>x.username===m.username))throw error(409,'That username is already in the team.');d.members.push(m);audit(d,who,'member_created',m.id,{role:m.role});});return send(res,201,{member:safeMember(m)});
     }
     const manage=route.match(/^\/api\/members\/([a-f0-9-]+)$/);
@@ -196,7 +204,7 @@ async function createApp(options={}) {
     if(req.method==='POST'&&route==='/api/activities'){
       throttle('activity:'+member.id,30,60000);const b=await readBody(req),input=activityInput(b);
       if(typeof b.requestKey!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(b.requestKey))throw error(400,'Refresh the activity form and try again.');
-      const result=await store.transaction(d=>{const who=actor(req,d);if(!Wallet.validWallet(who.walletAddress))throw error(400,'Save your Solana wallet in Edit profile before submitting work.');const payload={...input,...Rewards.quote(d,b),memberId:who.id};const hash=fingerprint(payload);
+      const result=await store.transaction(d=>{const who=actor(req,d);if(!Wallet.validWallet(who.walletAddress))throw error(400,'Save your Solana wallet in Edit profile before submitting work.');const source=Channels.approvedSource(who,{...b,platform:input.platform});const payload={...input,...Rewards.quote(d,b),memberId:who.id,sourceId:source.id,sourceUrl:source.url};const hash=fingerprint(payload);
         const existing=d.activities.find(a=>a.memberId===who.id&&a.requestKey===b.requestKey);
         if(existing){if(existing.fingerprint!==hash)throw error(409,'This submission was already used. Open a new form.');return {activity:existing,duplicate:true};}
         const duplicate=d.activities.find(a=>a.memberId===who.id&&(a.fingerprint===hash||(input.link&&a.link===input.link)));
@@ -215,14 +223,14 @@ async function createApp(options={}) {
           if(!['approved','rejected'].includes(b.status))throw error(400,'Invalid review.');
           const note=String(b.note||'').trim();if(note.length>300||b.status==='rejected'&&note.length<3)throw error(400,'Give a short reason for rejection (3–300 characters).');
           Object.assign(a,{status:b.status,reviewNote:note,reviewedBy:who.name,reviewedAt:new Date().toISOString()});
-          if(b.status==='approved'){const grant=Rewards.award(d,a,b,who);if(grant)a.rewardGrantId=grant.id;}
+          if(b.status==='approved'){if(a.sourceId)Channels.approvedSource(d.members.find(m=>m.id===a.memberId),a);const grant=Rewards.award(d,a,b,who);if(grant)a.rewardGrantId=grant.id;}
           audit(d,who,'activity_'+b.status,a.id,{note});
         }else{
           if(a.memberId!==who.id)throw error(403,'Only the author can correct this work.');
           if(a.status==='approved')throw error(409,'Approved work is locked.');
-          if((b.rewardType||'none')==='none')delete a.rewardQuote;const input=activityInput(b),hash=fingerprint({...input,memberId:who.id});
+          const source=Channels.approvedSource(who,{...b,platform:activityInput(b).platform});if(['none','custom'].includes(b.rewardType||'none'))delete a.rewardQuote;const input=activityInput(b),hash=fingerprint({...input,memberId:who.id,sourceId:source.id});
           if(d.activities.some(x=>x.id!==a.id&&x.memberId===who.id&&(x.fingerprint===hash||(input.link&&x.link===input.link))))throw error(409,'This work is already recorded.');
-          Object.assign(a,input,Rewards.quote(d,b,a),{fingerprint:hash,status:'pending',reviewNote:'',reviewedBy:null,reviewedAt:null,updatedAt:new Date().toISOString()});audit(d,who,'activity_corrected',a.id);
+          Object.assign(a,input,Rewards.quote(d,b,a),{sourceId:source.id,sourceUrl:source.url,fingerprint:hash,status:'pending',reviewNote:'',reviewedBy:null,reviewedAt:null,updatedAt:new Date().toISOString()});audit(d,who,'activity_corrected',a.id);
         }
         a.history.push(before);a.version++;return a;});return send(res,200,{activity:result});
     }

@@ -1,3 +1,14 @@
+# v5.3 — promotion channel approval and owner custom rewards
+
+- Required private three-part full name and phone number, plus existing Solana receiving address. Phone and full name are visible only to the member and owner.
+- Instagram, TikTok, Discord, X, Telegram, Facebook, YouTube and the existing other-platform options are available.
+- Members submit a public page/channel link for each place they plan to promote SEVEN. An independent Owner/Manager must check genuine recent activity and posting rights, then approve or reject with a reason. This is a manual review; the app does not claim to automatically measure followers or activity.
+- New activities require a complete profile and an approved source on the selected platform. Revoking source approval blocks subsequent submissions and approval of pending work tied to it. Old historical activities and ledger entries are preserved.
+- The owner may assign a custom USD reward to independently reviewed work; a reason and all quality checks are required. Managers cannot assign custom amounts. Existing weekly and unpaid-budget limits, duplicate-proof guards, and payout evidence still apply. Members can request a custom review but cannot choose their own amount.
+- Existing fixed rates are preserved as project policy, not academic or market standards. USD remains valuation; SEVEN is entered explicitly when preparing an owner wallet transfer.
+
+Deploy all files together using the same persistent DATA_DIR. Do not upload a sample data folder or delete existing team-data.json. Existing accounts complete their contact details in Edit profile, then submit their pages through Pages and channels. Owner reviews those pages from Team members → Pages and channels.
+
 # SEVEN Network · Marketing Team — v5.2
 
 Fixed, reviewed USD task rewards and verified purchase referrals replace all revenue sharing. No project-wallet address, holdings, revenue total, external treasury connection, or income-based reward estimate is served by this application.

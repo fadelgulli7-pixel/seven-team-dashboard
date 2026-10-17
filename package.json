@@ -1,12 +1,12 @@
 {
   "name": "seven-team-dashboard",
-  "version": "5.2.0",
+  "version": "5.3.0",
   "private": true,
   "description": "SEVEN Marketing Team: reviewed fixed task rewards, budget controls and private recovery",
   "scripts": {
     "start": "node server.js",
     "test": "node --test test/*.test.js",
-    "check": "node --check server.js && node --check tools.js && node --check lib/store.js && node --check lib/security.js && node --check lib/wallet.js && node --check lib/profile.js && node --check assets/contributions.js && node --check lib/legacy-treasury.js && node --check lib/recovery.js && node --check lib/rewards.js"
+    "check": "node --check server.js && node --check tools.js && node --check lib/store.js && node --check lib/security.js && node --check lib/wallet.js && node --check lib/profile.js && node --check assets/contributions.js && node --check lib/legacy-treasury.js && node --check lib/recovery.js && node --check lib/rewards.js && node --check lib/channels.js"
   },
   "engines": {
     "node": ">=22.13.0"
