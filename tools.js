@@ -21,7 +21,7 @@ async function main(){
   const store=await new FileStore(path.resolve(process.env.DATA_DIR)).open();
   try{
    const creds=await hashPassword(password);
-   await store.transaction(d=>{const owner=d.members.find(m=>m.role==='Owner');if(!owner)throw Error('Owner not found.');Object.assign(owner,creds,{active:true,mustChangePassword:true,authVersion:owner.authVersion+1});d.audit.push({id:crypto.randomUUID(),actorId:'server-operator',actorName:'Server operator',action:'owner_password_recovered',target:owner.id,details:{},createdAt:new Date().toISOString()});});
+   await store.transaction(d=>{const owner=d.members.find(m=>m.role==='Owner');if(!owner)throw Error('Owner not found.');Object.assign(owner,creds,{active:true,mustChangePassword:true,authVersion:owner.authVersion+1});delete owner.recovery;d.audit.push({id:crypto.randomUUID(),actorId:'server-operator',actorName:'Server operator',action:'owner_password_recovered',target:owner.id,details:{},createdAt:new Date().toISOString()});});
    console.log('Owner starter password reset. Existing records preserved. Remove OWNER_NEW_PASSWORD and restart the service.');
   }finally{await store.close();}return;
  }

@@ -5,15 +5,16 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const {FileStore}=require('./lib/store');
 const Treasury=require('./lib/treasury');
+const Recovery=require('./lib/recovery');
 const {validPhoto}=require('./lib/profile');
 const {hashPassword,verifyPassword,equalSecret,Limiter}=require('./lib/security');
 const categories=['Marketing','Content','Community','Partnership','Development','Other'];
 const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Other'];
-const BUILD='2026-10-16-family-v4.0.0';
+const BUILD='2026-10-17-marketing-v4.1.0';
 const TTL=12*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
-const safeMember=m=>Object.fromEntries(['id','name','handle','username','role','initials','createdAt','active','mustChangePassword','photo'].map(k=>[k,m[k]]));
+const safeMember=m=>({...Object.fromEntries(['id','name','handle','username','role','initials','createdAt','active','mustChangePassword','photo'].map(k=>[k,m[k]])),recoveryReady:!!m.recovery&&Date.parse(m.recovery.expiresAt)>Date.now()});
 const validPassword=p=>typeof p==='string'&&p.length>=12&&p.length<=200;
 function memberInput(body) {
   if(typeof body.name!=='string'||body.name.trim().length<2||body.name.trim().length>50||typeof body.username!=='string'||!/^[a-zA-Z0-9_.-]{3,32}$/.test(body.username)||!validPassword(body.password))throw error(400,'Enter a name, a valid username, and a password of 12–200 characters.');
@@ -45,6 +46,11 @@ async function createApp(options={}) {
   if(env.NODE_ENV==='production'&&!env.DATA_DIR&&!options.dataDir)throw Error('Set DATA_DIR to your persistent disk before production startup.');
   // Read required assets before acquiring the data-directory lock.
   const html=await fs.readFile(path.join(__dirname,'index.html'));
+  // Refuse a partial upload before opening the persistent store.
+  for(const asset of ['seven-logo.png','contributions.js']){
+    try{await fs.access(path.join(__dirname,'assets',asset));}
+    catch{throw Error('Missing assets/'+asset+'. Upload the entire assets folder from the ZIP.');}
+  }
   const dummy=await hashPassword(crypto.randomBytes(32).toString('hex'));
   const store=options.store||await new FileStore(path.resolve(dataDir)).open();
   const sessions=new Map(),limiter=new Limiter();
@@ -93,6 +99,21 @@ async function createApp(options={}) {
       if(!latest.active||latest.authVersion!==m.authVersion)throw error(401,'Please sign in again.');
       limiter.clear('login-user:'+name);return beginSession(req,res,latest);
     }
+    if(req.method==='POST'&&route==='/api/recovery/reset'){
+      const b=await readBody(req),username=String(b.username||'').trim().toLowerCase().slice(0,33);
+      throttle('recovery-ip:'+ip,40);throttle('recovery-user:'+username,8);
+      if(!validPassword(b.newPassword))throw error(400,'Use a password of 12–200 characters.');
+      // Equal password-hashing work for unknown, suspended, expired and valid codes.
+      const credentials=await cryptoWork(()=>hashPassword(b.newPassword));
+      const changed=await store.transaction(d=>{
+        const m=d.members.find(x=>x.username===username);
+        if(!m||!m.active||!Recovery.matches(m.recovery,b.code))throw error(400,'Recovery details are incorrect or expired.');
+        Object.assign(m,credentials,{mustChangePassword:false,authVersion:m.authVersion+1});
+        delete m.recovery; audit(d,m,'password_recovered',m.id);return m;
+      });
+      revoke(changed.id);limiter.clear('login-user:'+username);limiter.clear('recovery-user:'+username);
+      return send(res,200,{ok:true});
+    }
     if(req.method==='POST'&&route==='/api/logout'){
       const s=sessions.get(sidOf(req));if(s&&!equalSecret(req.headers['x-csrf-token'],s.csrf))throw error(403,'Request could not be verified.');sessions.delete(sidOf(req));return send(res,200,{ok:true},{'Set-Cookie':cookie(req,'',0)});
     }
@@ -104,10 +125,17 @@ async function createApp(options={}) {
       if(!await cryptoWork(()=>verifyPassword(b.currentPassword,member)))throw error(401,'Current password is incorrect.');
       if(!validPassword(b.newPassword)||b.newPassword===b.currentPassword)throw error(400,'Use a different password of 12–200 characters.');
       const creds=await cryptoWork(()=>hashPassword(b.newPassword));
-      const updated=await store.transaction(d=>{const m=identity(req,d).member;Object.assign(m,creds,{mustChangePassword:false,authVersion:m.authVersion+1});audit(d,m,'password_changed',m.id);return m;});
+      const updated=await store.transaction(d=>{const m=identity(req,d).member;Object.assign(m,creds,{mustChangePassword:false,authVersion:m.authVersion+1});delete m.recovery;audit(d,m,'password_changed',m.id);return m;});
       revoke(member.id);return beginSession(req,res,updated);
     }
     actor(req);
+    if(req.method==='POST'&&route==='/api/recovery/code'){
+      throttle('recovery-generate:'+member.id,8);const b=await readBody(req);
+      if(!await cryptoWork(()=>verifyPassword(b.password,member)))throw error(401,'Current password is incorrect.');
+      const issued=Recovery.issue();
+      await store.transaction(d=>{const m=actor(req,d);m.recovery=issued.record;audit(d,m,'recovery_code_created',m.id);});
+      return send(res,201,{code:issued.code,expiresAt:issued.record.expiresAt});
+    }
     if(req.method==='POST'&&route==='/api/profile'){
       throttle('profile:'+member.id,30);const b=await readBody(req,160000);
       const name=typeof b.name==='string'?b.name.trim():'';
@@ -116,11 +144,15 @@ async function createApp(options={}) {
       const updated=await store.transaction(d=>{const who=actor(req,d);Object.assign(who,{name,initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),photo:b.photo});audit(d,who,'profile_updated',who.id);return who;});
       return send(res,200,{member:safeMember(updated)});
     }
-    if(req.method==='GET'&&route==='/api/finance')return send(res,200,Treasury.summary(store.data,await treasury()));
+    if(req.method==='GET'&&route==='/api/finance'){const state=await treasury();return send(res,200,{revision:store.data.revision,...Treasury.summary(store.data,state)});}
     if(req.method==='POST'&&['/api/finance/settle','/api/finance/payment','/api/finance/void'].includes(route)){
       owner(actor(req));const b=await readBody(req);const state=route.endsWith('/settle')?await treasury():null;
       const result=await store.transaction(d=>{const m=actor(req,d);owner(m);const r=route.endsWith('/settle')?Treasury.settle(d,state,b,m):route.endsWith('/payment')?Treasury.payment(d,b,m):Treasury.voidPayment(d,b,m);audit(d,m,'finance.'+route.split('/').pop(),r.id,{assetId:r.assetId,raw:r.raw});return r;});
       return send(res,201,{id:result.id});
+    }
+    if(req.method==='GET'&&route==='/api/workspace'){
+      const state=await treasury();const who=actor(req);const d=store.data;
+      return send(res,200,{member:safeMember(who),members:d.members.map(safeMember),activities:d.activities.map(({history,fingerprint,requestKey,...a})=>a),revision:d.revision,build:BUILD,finance:Treasury.summary(d,state)});
     }
     if(req.method==='GET'&&route==='/api/data')return send(res,200,{member:safeMember(member),members:store.data.members.map(safeMember),activities:store.data.activities.map(({history,fingerprint,requestKey,...a})=>a),revision:store.data.revision,build:BUILD});
     if(req.method==='GET'&&route==='/api/audit'){owner(member);return send(res,200,{events:store.data.audit.slice(-200).reverse()});}
@@ -141,7 +173,7 @@ async function createApp(options={}) {
       const changed=await store.transaction(d=>{const who=actor(req,d);owner(who);const m=d.members.find(x=>x.id===manage[1]);if(!m)throw error(404,'Member not found.');if(m.role==='Owner')throw error(409,'The owner cannot be suspended or changed here.');
         if(b.action==='role'){if(!['Manager','Member'].includes(b.role))throw error(400,'Invalid role.');m.role=b.role;}
         if(b.action==='active'){if(typeof b.active!=='boolean')throw error(400,'Invalid status.');m.active=b.active;}
-        if(creds)Object.assign(m,creds,{mustChangePassword:true});m.authVersion++;audit(d,who,'member_'+b.action,m.id,{role:m.role,active:m.active});return m;});
+        if(creds){Object.assign(m,creds,{mustChangePassword:true});delete m.recovery;}m.authVersion++;audit(d,who,'member_'+b.action,m.id,{role:m.role,active:m.active});return m;});
       revoke(changed.id);return send(res,200,{member:safeMember(changed)});
     }
     if(req.method==='POST'&&route==='/api/activities'){
