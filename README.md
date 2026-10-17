@@ -1,3 +1,18 @@
+# SEVEN Marketing v5.5
+
+This release updates the existing v5.4 dashboard. Upload the full source tree; keep the existing DATA_DIR persistent disk and team-data.json. Build with npm ci, start with node server.js. Do not upload a local data folder.
+
+- Scheduled marketing tasks use campaigns: title, objective, instructions, start, deadline, topic and required deliverable. Members can open Campaigns from the home page or Rewards. Choose Invites + Post, or Educational tasks + Educational video, for example. New submissions are rejected outside the active window or if their reward task type does not match the required deliverable. Older campaign records remain readable. Device-local inputs are converted to ISO and displayed in Baghdad time. Owner must write the campaign content in the audience language; user-authored text is deliberately not machine translated.
+- Member telephone is optional; if supplied, its format is validated. Members still use their three-part name. The owner project profile does not collect or expose fullName or telephone.
+- Existing owner profile is migrated once to SEVEN Network / @SEVN_Network, removing its personal contact fields. Authentication username/password, work, rewards and historical audit records are preserved. Owner profile name remains editable. New owner setup requests the project name.
+- Sessions last 30 days from sign-in and survive service restarts on the same DATA_DIR. Only SHA-256 digests of opaque session cookies are stored in a private mode-0600 sessions.json, with CSRF secrets and authVersion. Logout persists revocation; password changes, recovery, suspension and access changes still invalidate sessions. Browser clearing cookies, deliberate logout, expiry or changing DATA_DIR requires signing in again. Existing pre-upgrade in-memory sessions require one new sign-in. Session data is never part of the public dashboard or ordinary team-data backup.
+- Six non-English dictionaries now cover all 491 registered interface keys (English is the source language), including reward explanations and recovery screens. Language switching recognizes previously translated labels. Brand names, wallet addresses and user-authored text stay unchanged. Unknown server errors use a localized actionable message rather than leaking English/internal details; this is not a professional linguistic certification or a claim about every external Phantom/browser error.
+
+Validation: npm run check and node test suite; real localhost restart with retained cookie, hash-only persistence, logout and password revocation; optional phone/project privacy; scheduled task and deliverable enforcement; dictionary parity and reverse language switching. No live Render deployment, mobile visual inspection or actual payment was performed in this environment. Existing Phantom payment checks are preserved.
+
+---
+Previous release notes (historical):
+
 # v5.4 — campaign quality, seven locales and Phantom wallet payments
 
 ## New languages

@@ -14,11 +14,11 @@ const {validPhoto}=require('./lib/profile');
 const {hashPassword,verifyPassword,equalSecret,Limiter}=require('./lib/security');
 const categories=['Marketing','Content','Community','Partnership','Development','Other'];
 const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Facebook','Other'];
-const BUILD='2026-10-17-marketing-v5.4.0';
-const TTL=12*60*60*1000;
+const BUILD='2026-10-17-marketing-v5.5.0';
+const TTL=30*24*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
-const safeMember=(m,viewer=m)=>({...Object.fromEntries(['id','name','handle','username','role','initials','createdAt','active','mustChangePassword','photo'].map(k=>[k,m[k]])),hasWallet:!!m.walletAddress,channels:m.channels||[],profileComplete:!!m.fullName&&!!m.phone,...(viewer.id===m.id||viewer.role==='Owner'?{fullName:m.fullName||'',phone:m.phone||''}:{}),...(viewer.id===m.id||viewer.role==='Owner'?{walletAddress:m.walletAddress||''}:{}),recoveryReady:!!m.recovery&&Date.parse(m.recovery.expiresAt)>Date.now()});
+const safeMember=(m,viewer=m)=>({...Object.fromEntries(['id','name','handle','username','role','initials','createdAt','active','mustChangePassword','photo'].map(k=>[k,m[k]])),hasWallet:!!m.walletAddress,channels:m.channels||[],profileComplete:m.role==='Owner'||!!m.fullName,...(m.role!=='Owner'&&(viewer.id===m.id||viewer.role==='Owner')?{fullName:m.fullName||'',phone:m.phone||''}:{}),...(viewer.id===m.id||viewer.role==='Owner'?{walletAddress:m.walletAddress||''}:{}),recoveryReady:!!m.recovery&&Date.parse(m.recovery.expiresAt)>Date.now()});
 const validPassword=p=>typeof p==='string'&&p.length>=12&&p.length<=200;
 function memberInput(body) {
   if(typeof body.name!=='string'||body.name.trim().length<2||body.name.trim().length>50||typeof body.username!=='string'||!/^[a-zA-Z0-9_.-]{3,32}$/.test(body.username)||!validPassword(body.password))throw error(400,'Enter a name, a valid username, and a password of 12–200 characters.');
@@ -59,25 +59,33 @@ async function createApp(options={}) {
   }
   const dummy=await hashPassword(crypto.randomBytes(32).toString('hex'));
   const store=options.store||await new FileStore(path.resolve(dataDir)).open();
-  const sessions=new Map(),limiter=new Limiter();
+  const sessionFile=path.join(path.resolve(dataDir),'sessions.json');
+  const sessionFs=require('node:fs');
+  let saved=[];try{saved=JSON.parse(await fs.readFile(sessionFile,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
+  const sessions=new Map(saved.filter(([,s])=>s&&s.expiresAt>Date.now())),limiter=new Limiter();
+  const existingOwner=store.data.members.find(m=>m.role==='Owner');
+  if(existingOwner&&!existingOwner.projectProfileVersion)await store.transaction(d=>{const m=d.members.find(m=>m.role==='Owner');m.name='SEVEN Network';m.handle='@SEVN_Network';m.initials='SN';delete m.fullName;delete m.phone;m.projectProfileVersion=1;audit(d,m,'project_profile_enabled',m.id);});
+
+  function saveSessions(){const temp=sessionFile+'.tmp';sessionFs.writeFileSync(temp,JSON.stringify([...sessions]),{mode:0o600});sessionFs.renameSync(temp,sessionFile);}
+
 
   let cryptoJobs=0;
   async function cryptoWork(fn){if(cryptoJobs>=8)throw error(429,'Service is busy. Try again shortly.');cryptoJobs++;try{return await fn();}finally{cryptoJobs--;}}
   function secure(req){return req.socket.encrypted||env.NODE_ENV==='production'||req.headers['x-forwarded-proto']==='https';}
   function cookie(req,value,age){return `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${secure(req)?'; Secure':''}`;}
-  function sidOf(req){return (req.headers.cookie||'').match(/(?:^|;\s*)seven_session=([a-f0-9-]+)/)?.[1];}
+  function sidOf(req){const raw=(req.headers.cookie||'').match(/(?:^|;\s*)seven_session=([a-f0-9-]+)/)?.[1];return raw&&crypto.createHash('sha256').update(raw).digest('hex');}
   function beginSession(req,res,member,status=200){
     const perUser=[...sessions].filter(([,s])=>s.memberId===member.id);
     for(const [sid]of perUser.slice(0,Math.max(0,perUser.length-4)))sessions.delete(sid);
     const sid=crypto.randomUUID(),csrf=crypto.randomUUID();
-    sessions.set(sid,{memberId:member.id,authVersion:member.authVersion,csrf,expiresAt:Date.now()+TTL});
+    sessions.set(crypto.createHash('sha256').update(sid).digest('hex'),{memberId:member.id,authVersion:member.authVersion,csrf,expiresAt:Date.now()+TTL});saveSessions();
     send(res,status,{member:safeMember(member),csrf},{'Set-Cookie':cookie(req,sid,TTL/1000)});
   }
   function identity(req,data=store.data){const s=sessions.get(sidOf(req));const m=s&&data.members.find(m=>m.id===s.memberId);if(!s||s.expiresAt<=Date.now()||!m||!m.active||s.authVersion!==m.authVersion)throw error(401,'Please sign in again.');return {session:s,member:m};}
   function actor(req,d){const {member}=identity(req,d);if(member.mustChangePassword)throw error(403,'Change your starter password first.');return member;}
   function owner(m){if(m.role!=='Owner')throw error(403,'Only the owner can do this.');}
   function throttle(key,max=8,ms=15*60*1000){if(!limiter.take(key,max,ms))throw error(429,'Too many attempts. Try again later.');}
-  function revoke(id){for(const [sid,s]of sessions)if(s.memberId===id)sessions.delete(sid);}
+  function revoke(id){for(const [sid,s]of sessions)if(s.memberId===id)sessions.delete(sid);saveSessions();}
   const cleanup=setInterval(()=>{for(const [id,s]of sessions)if(s.expiresAt<=Date.now())sessions.delete(id);for(const [id,s]of limiter.items)if(s.until<=Date.now())limiter.items.delete(id);},60000);cleanup.unref();
   async function api(req,res,url){
     const route=url.pathname,ip=req.socket.remoteAddress;
@@ -91,7 +99,7 @@ async function createApp(options={}) {
       if(store.data.members.length)throw error(409,'The owner account already exists.');
       if(!env.SETUP_TOKEN||env.SETUP_TOKEN.length<24)throw error(503,'Owner setup is locked. Configure SETUP_TOKEN on the server.');
       if(!equalSecret(b.setupToken,env.SETUP_TOKEN))throw error(403,'Setup code is incorrect.');
-      const m={...memberInput(b),...await cryptoWork(()=>hashPassword(b.password)),role:'Owner',mustChangePassword:false};
+      const m={...memberInput(b),...await cryptoWork(()=>hashPassword(b.password)),role:'Owner',handle:'@SEVN_Network',mustChangePassword:false,projectProfileVersion:1};
       await store.transaction(d=>{if(d.members.length)throw error(409,'The owner account already exists.');d.members.push(m);audit(d,m,'owner_created',m.id);});return beginSession(req,res,m,201);
     }
     if(req.method==='POST'&&route==='/api/login'){
@@ -121,7 +129,7 @@ async function createApp(options={}) {
       return send(res,200,{ok:true});
     }
     if(req.method==='POST'&&route==='/api/logout'){
-      const s=sessions.get(sidOf(req));if(s&&!equalSecret(req.headers['x-csrf-token'],s.csrf))throw error(403,'Request could not be verified.');sessions.delete(sidOf(req));return send(res,200,{ok:true},{'Set-Cookie':cookie(req,'',0)});
+      const s=sessions.get(sidOf(req));if(s&&!equalSecret(req.headers['x-csrf-token'],s.csrf))throw error(403,'Request could not be verified.');sessions.delete(sidOf(req));saveSessions();return send(res,200,{ok:true},{'Set-Cookie':cookie(req,'',0)});
     }
     const {member,session}=identity(req);
     if(req.method==='POST'&&!equalSecret(req.headers['x-csrf-token'],session.csrf))throw error(403,'Request could not be verified.');
@@ -148,8 +156,8 @@ async function createApp(options={}) {
       if(name.length<2||name.length>50)throw error(400,'Use a name of 2–50 characters.');
       if(typeof b.photo!=='string'||(b.photo!==''&&!validPhoto(b.photo)))throw error(400,'Choose a JPEG photo smaller than 100 KB.');
       if(!Wallet.validWallet(b.walletAddress))throw error(400,'Enter a valid Solana receiving wallet address.');
-      const contact=Channels.contact(b);
-      const updated=await store.transaction(d=>{const who=actor(req,d);Object.assign(who,{...contact,walletAddress:b.walletAddress,name,initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),photo:b.photo});audit(d,who,'profile_updated',who.id);return who;});
+      const contact=member.role==='Owner'?{}:Channels.contact({...b,role:member.role});
+      const updated=await store.transaction(d=>{const who=actor(req,d);Object.assign(who,{...contact,walletAddress:b.walletAddress,name,initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),photo:b.photo});if(who.role==='Owner'){delete who.fullName;delete who.phone;}audit(d,who,'profile_updated',who.id);return who;});
       return send(res,200,{member:safeMember(updated)});
     }
     if(req.method==='POST'&&route==='/api/channels'){
@@ -197,7 +205,7 @@ async function createApp(options={}) {
     }
     if(req.method==='POST'&&route==='/api/members'){
       owner(member);throttle('member-create:'+member.id,30);const b=await readBody(req);
-      const m={...memberInput(b),...Channels.contact(b),channels:[],...await cryptoWork(()=>hashPassword(b.password)),role:b.role==='Manager'?'Manager':'Member',mustChangePassword:true};
+      const m={...memberInput(b),...Channels.contact({...b,role:b.role==='Manager'?'Manager':'Member'}),channels:[],...await cryptoWork(()=>hashPassword(b.password)),role:b.role==='Manager'?'Manager':'Member',mustChangePassword:true};
       await store.transaction(d=>{const who=actor(req,d);owner(who);if(d.members.some(x=>x.username===m.username))throw error(409,'That username is already in the team.');d.members.push(m);audit(d,who,'member_created',m.id,{role:m.role});});return send(res,201,{member:safeMember(m)});
     }
     const manage=route.match(/^\/api\/members\/([a-f0-9-]+)$/);
