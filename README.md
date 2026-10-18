@@ -1,3 +1,35 @@
+# SEVEN Marketing v5.6.4 — Phantom Lighthouse compatibility
+
+Build: `2026-10-18-marketing-v5.6.4`.
+
+## Evidence and fix
+
+The user's 5.6.3 diagnostic shows 4 reserved instructions and 6 returned instructions, unchanged payer/blockhash, unchanged first four instructions, and two trailing single-account instructions targeting `L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95`. This is Lighthouse. Phantom documents that it appends Lighthouse runtime assertions as user protection. The earlier whole-message byte-equality check rejected these legitimate additions. Explicit priority fees alone did not address this cause.
+
+Primary references:
+- https://docs.phantom.com/developer-powertools/lighthouse
+- https://phantom.com/learn/blog/anti-spoofing-security
+- https://github.com/Jac0xb/lighthouse/tree/4c579479c98635e419b1b167f08be02a71604a71
+
+`lib/payout-message.js` now allows a narrowly constrained Lighthouse tail while checking the original payment strictly. Original payer/blockhash, original instruction order/data/programs/accounts/privileges, and their reconstructed reserved message must match. At most three trailing instructions may be added. Each must target the exact Lighthouse ID, have one account already referenced by the reserved message, bounded data (3–512 bytes), and an approved read-only assertion opcode (2,3,5,6,7,8,9,10). Original account privileges cannot change; the only new account may be the read-only non-signer Lighthouse program. MemoryWrite/MemoryClose, delta/memory, Merkle/CPI, unknown opcodes/programs, extra transfers, fee edits, account changes and new signers are rejected.
+
+The original signed transaction INCLUDING the guards is signature-verified, persisted before broadcast and sent without stripping or rebuilding it. The saved base reservation is not rewritten. A different guarded signature cannot replace an already reserved signature. Chain assertion failures do not post payments. Unknown results stay reserved; once-only confirmed ledger reconciliation remains in effect.
+
+This compatibility rule checks instruction envelope/privileges, not every assertion argument; the known assertion entrypoints validate their payload and conditions onchain. A malformed or unsatisfied assertion can still fail the chain transaction, with a network fee, and never counts as payment. No Lighthouse memory or CPI operation is accepted.
+
+## Validation
+
+71 automated tests pass and npm run check passes. New tests sign real local transactions with representative Lighthouse assertions derived from the pinned upstream Borsh definitions; compare the actual broadcast/persisted signed bytes; reconcile once; reject payment/fee/blockhash/privilege/program changes and memory/CPI opcodes; prevent guarded signature replacement and false ledger payment after assertion failure. Existing browser/server serialization, session, authorization, reward and storage tests also pass. RPC/provider tests are mocked except the existing local HTTP RPC compatibility check. No real mobile-wallet transfer, live funds sent or production mutation/deployment was performed. The user's actual guard payload bytes were not supplied; representative fixtures are labeled accordingly.
+
+## Deploy
+
+Upload ALL files, especially new lib/payout-message.js, lib/payouts.js and server.js. Keep DATA_DIR/team-data.json/sessions.json/backups. Build npm ci; start node server.js. Check /health for the build above. Check the existing payment first; if expired close and prepare a new one. Never duplicate a broadcast/unknown payment. Verify one deliberately small owner-approved mobile payment after deployment and inspect its confirmed transaction before broader payouts.
+
+This fixes the identified Phantom integration incompatibility. Solflare's external domain classification remains a separate support review issue; no security feature is disabled or bypassed.
+
+---
+Historical notes:
+
 # SEVEN Marketing v5.6.3 — diagnostic visible without downloads
 
 Build: `2026-10-18-marketing-v5.6.3`.

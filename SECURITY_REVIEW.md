@@ -1,3 +1,10 @@
+# Current supplement — 5.6.4
+
+The user's diagnostic and Phantom primary docs identified wallet-added Lighthouse assertions as the mismatch. Added constrained read-only guard compatibility in lib/payout-message.js. This deliberately replaces whole-message equality ONLY for a strict unchanged-payment prefix plus approved trailing guards. It does not disable guards, remove signed instructions, allow arbitrary programs or permit payment edits. Read README.md for the exact acceptance policy, pinned upstream reference, tests and limits.
+
+71 tests pass, including adversarial edits and guarded retries/chain failure. Real mobile and production transfer still require verification. No dependencies added; no production data or funds touched. Solflare classification unchanged.
+
+---
 # Current supplement — v5.6.3
 
 No-download owner diagnostic summary/text field and clipboard/manual-selection fallback. No payout validation relaxation. 68 regression tests pass. Unresolved mobile signed-message mismatch remains under investigation.
