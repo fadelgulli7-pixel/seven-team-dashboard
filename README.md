@@ -1,3 +1,9 @@
+SEVEN Marketing v5.6.5 — confirmed receipts and settlement status
+Confirmed blockchain payments show Received in member profile and personal view, including amount, settlement, time, source, recipient and explorer link. Details are restricted to owner and recipient.
+Owner refresh reconciles up to 10 broadcast jobs; an open broadcast dialog checks again every 5 seconds. Unknown results stay reserved. No signing or new transfers occur during reconciliation.
+Existing server-side zero-due rejection remains. New approved earnings permit only the new outstanding amount; previous receipts remain. Added regression tests for settlement/new earnings and private receipt rendering.
+Deploy all source files; preserve DATA_DIR, sessions and backups. This build has not been deployed by the assistant. Opening the owner panel reconciles previous broadcast payments, including the successful payment shown by the user.
+
 # SEVEN Marketing v5.6.4 — Phantom Lighthouse compatibility
 
 Build: `2026-10-18-marketing-v5.6.4`.

@@ -14,7 +14,7 @@ const {validPhoto}=require('./lib/profile');
 const {hashPassword,verifyPassword,equalSecret,Limiter}=require('./lib/security');
 const categories=['Marketing','Content','Community','Partnership','Development','Other'];
 const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Facebook','Other'];
-const BUILD='2026-10-18-marketing-v5.6.4';
+const BUILD='2026-10-18-marketing-v5.6.5';
 const TTL=30*24*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
@@ -167,7 +167,7 @@ async function createApp(options={}) {
       const b=await readBody(req);const channel=await store.transaction(d=>{const who=actor(req,d),target=d.members.find(m=>m.id===b.memberId);if(!target)throw error(404,'Member not found.');const c=Channels.review(target,b,who);audit(d,who,'channel_'+c.status,c.id,{memberId:target.id,note:c.note});return c;});return send(res,200,{channel});
     }
     if(route==='/api/finance'||route.startsWith('/api/finance/'))throw error(410,'Revenue sharing has been retired.');
-    const rewardView=()=>{const view=Rewards.summary(store.data);if(member.role!=='Owner')view.payments=view.payments.map(p=>Object.fromEntries(['id','memberId','amountCents','currency','createdAt','voidedAt'].map(k=>[k,p[k]])));if(!['Owner','Manager'].includes(member.role))view.referrals=view.referrals.filter(c=>c.memberId===member.id).map(c=>Object.fromEntries(['id','memberId','claimedUsdCents','verifiedUsdCents','commissionCents','status','createdAt','confirmedAt','reviewNote','reversalReason'].map(k=>[k,c[k]])));return view;};
+    const rewardView=()=>{const view=Rewards.summary(store.data);view.walletPayments=(store.data.payoutJobs||[]).filter(j=>member.role==='Owner'||j.memberId===member.id).map(j=>Object.fromEntries(['id','memberId','status','amount','usdCents','recipient','source','signature','createdAt','confirmedAt'].map(k=>[k,j[k]])));if(member.role!=='Owner')view.payments=view.payments.map(p=>Object.fromEntries(['id','memberId','amountCents','currency','createdAt','voidedAt'].map(k=>[k,p[k]])));if(!['Owner','Manager'].includes(member.role))view.referrals=view.referrals.filter(c=>c.memberId===member.id).map(c=>Object.fromEntries(['id','memberId','claimedUsdCents','verifiedUsdCents','commissionCents','status','createdAt','confirmedAt','reviewNote','reversalReason'].map(k=>[k,c[k]])));return view;};
     if(req.method==='POST'&&route==='/api/rewards/prepare-transfer'){
       owner(member);const b=await readBody(req);const d=store.data;owner(actor(req,d));
       if(b.revision!==d.revision)throw error(409,'This record changed. Refresh and try again.');
