@@ -1,6 +1,6 @@
 {
-  "build": "2026-10-18-marketing-v5.6.1",
-  "note": "Inventory and byte hashes, not an assertion of exhaustive third-party code audit.",
+  "build": "2026-10-18-marketing-v5.6.2",
+  "note": "Inventory hashes, not a security certification.",
   "files": [
     {
       "path": ".gitignore",
@@ -24,23 +24,23 @@
     },
     {
       "path": "README.md",
-      "bytes": 30287,
-      "sha256": "002706855c1961010e98da18775c9e55cfbdd4c4d38a1b0983dd6b1c215554cb"
+      "bytes": 32377,
+      "sha256": "c721d2ecf11248623f95d6a08c49a11cb6703a942e5c4aaf8f06635a184709b1"
     },
     {
       "path": "SECURITY_REVIEW.md",
-      "bytes": 3149,
-      "sha256": "196b1a6141ebe9e592fe41e3cc441f42be5ad08f957513a467b771cd94b3e006"
+      "bytes": 3602,
+      "sha256": "1dd3661735c256d7cf58627413846d93ed72bac0487941ec9a7da2bf383e305f"
     },
     {
       "path": "START_HERE_KU.txt",
-      "bytes": 1522,
-      "sha256": "8da4537bf8f0c12fe4fe65d79852ef63bc658851c2ad34b931e5682656156d90"
+      "bytes": 1326,
+      "sha256": "46df5a901e69be6d3c470c3bdc5a3bc88db83916a0a1276b5898c349d627765a"
     },
     {
       "path": "TEST_RESULTS.txt",
-      "bytes": 7059,
-      "sha256": "4b0243a444a9670556e3571b83f233f19e10de93a2599eed567f77968856a686"
+      "bytes": 7287,
+      "sha256": "3ed4ccd3695f71229bfa07bb3437edc412756a05482cb5d4ca2e748e5b564a55"
     },
     {
       "path": "TREASURY_GUIDE_KU.txt",
@@ -64,8 +64,8 @@
     },
     {
       "path": "assets/languages.js",
-      "bytes": 243577,
-      "sha256": "773696f4a92a1b4d667f187d76529d0be1502b1c0995e2af2034645ecd0653ef"
+      "bytes": 245678,
+      "sha256": "f0d5a027ff56477060f37a221ed034ddc14e85fb6d5db65fd1f2a19a4b56ec70"
     },
     {
       "path": "assets/seven-logo.png",
@@ -84,8 +84,8 @@
     },
     {
       "path": "index.html",
-      "bytes": 210699,
-      "sha256": "a078df264032f1e71b73fe834c4a8d0371d175cd8aa79effd756e612db99e4a6"
+      "bytes": 211341,
+      "sha256": "b3ccaa7c56c9f829b422448056e9fbae51024234413228fbbef7f96b8e1a55bb"
     },
     {
       "path": "lib/campaigns.js",
@@ -104,8 +104,8 @@
     },
     {
       "path": "lib/payouts.js",
-      "bytes": 9086,
-      "sha256": "3bfc58e6053af87df42361e3b95420cd9ea9ceb6babee208b0769d8bcc890eef"
+      "bytes": 10911,
+      "sha256": "40fc2946736edc24cee6ecb92b5046921394de2594841245ce58cf1b5536e317"
     },
     {
       "path": "lib/profile.js",
@@ -150,17 +150,17 @@
     {
       "path": "package-lock.json",
       "bytes": 35760,
-      "sha256": "f2948f88b9db80719cbf0c37891996a83e90b5fc93fc46aff740eb54f792948f"
+      "sha256": "5f1f57b254ffb932539f716cf499033346b75857dab31b404bdba0b03c35ef96"
     },
     {
       "path": "package.json",
       "bytes": 986,
-      "sha256": "2e41abb8ddb734cca6e9dc35289d5790b76ba2455b721f46adf5758c3645032a"
+      "sha256": "3ed7a04a583c546bab85670c6f07d68b6daab5e55676460728ebf18c00839320"
     },
     {
       "path": "server.js",
-      "bytes": 30225,
-      "sha256": "8fb77d34b2c0295b3806f7d6791b4413f4bba145ef2c0c61df8866566de16dc3"
+      "bytes": 30272,
+      "sha256": "baeaa9d1c86fe9c17305b850daf6b247095a5365cc1bb96ac54328894dab266f"
     },
     {
       "path": "test/app.test.js",
@@ -189,13 +189,13 @@
     },
     {
       "path": "test/payout-ui.test.js",
-      "bytes": 1987,
-      "sha256": "2ca779c0a99e0013be788bf562780cc656a74a3d433f70e7699835aa5c433816"
+      "bytes": 3239,
+      "sha256": "8c7d9254dcf9348c3b7ef4b96e0e96446567f2053aee430cbdd7dd790eb4b355"
     },
     {
       "path": "test/payouts.test.js",
-      "bytes": 12312,
-      "sha256": "9f5e20ba975b6550129e0653b77373d434395942d5a65418a81b984a77320077"
+      "bytes": 14227,
+      "sha256": "266e4b9d85aa00a10c34bb553bd873fd12e1e74eef0f5cb14bbde269fb3eb87e"
     },
     {
       "path": "test/rewards.test.js",

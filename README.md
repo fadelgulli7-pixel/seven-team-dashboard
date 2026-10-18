@@ -1,3 +1,20 @@
+# SEVEN Marketing v5.6.2 — signed-message diagnostics
+
+Build: `2026-10-18-marketing-v5.6.2`.
+
+The user's new screenshot confirms PAYOUT_MESSAGE_CHANGED persists after 5.6.1. Fee insertion alone has NOT been established as the root cause, and live payment success has not been demonstrated. This release adds evidence collection, not a claim that mobile payments are fixed.
+
+On signed-message rejection, only the owner sees a Download payment diagnostic button. The JSON describes before/after instruction counts, program IDs, compute-unit limit/price where applicable, key-change flags, blockhash/header/account-order change flags, and SHA-256 hashes. It contains neither the signed transaction, raw serialized messages, signature, private key nor recovery phrase. The application does not save this report to the persistent store or send it elsewhere; the owner may choose to download and share it for troubleshooting.
+
+All existing exact-message, source-account, signature, reservation and ledger protections remain enforced. Solflare domain classification remains a separate issue for official support review.
+
+Validation: 68 passing automated tests, including precise changed-fee and changed-blockhash diagnostics, extra-instruction detection, absence of signed bytes/signature in the report, owner UI download flow and the prior 66 regression tests. Changed JS plus inline browser script compile successfully. Node dependencies are unchanged from the zero-advisory 5.6.1 check. No live mobile-wallet test, transfer or production deployment was performed.
+
+Deploy the complete tree preserving DATA_DIR/team-data.json/sessions.json/backups. Build npm ci; start node server.js. Verify the build above. Open the existing reserved job and Check payment status; if expired, a new preparation is required. Never duplicate a broadcast/unknown payment. If message rejection recurs after an owner-approved signing attempt, download seven-payment-diagnostic.json and attach it to the troubleshooting conversation; do not keep retrying with different amounts or wallets.
+
+---
+Historical notes:
+
 # SEVEN Marketing v5.6.1 — payout validation review
 
 Build: `2026-10-18-marketing-v5.6.1`.

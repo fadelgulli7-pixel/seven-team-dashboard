@@ -1,3 +1,8 @@
+# Current supplement — 5.6.2
+
+The supplied live screenshot still rejects a changed signed message. The cause remains unconfirmed. Added owner-only bounded diagnostic response and explicit download of a summary containing no signed transaction or signature. No authorization or message-equality checks relaxed. 68 tests pass. Production deployment and real mobile payment remain unverified. See README.md for current instructions and limitations.
+
+---
 # Current review — 5.6.1
 
 Reviewed application areas: HTTP authorization and CSRF, auth/recovery/session persistence, atomic storage and backup protections, profile privacy, page/campaign review, rewards and referral ledger, Solana token construction, wallet adapters, browser/server serialization, payout reservation/signature/broadcast/reconciliation, locale error handling, static asset routing and CSP. Historical treasury code remains a validation-only compatibility shim.

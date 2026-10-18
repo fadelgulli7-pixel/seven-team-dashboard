@@ -14,7 +14,7 @@ const {validPhoto}=require('./lib/profile');
 const {hashPassword,verifyPassword,equalSecret,Limiter}=require('./lib/security');
 const categories=['Marketing','Content','Community','Partnership','Development','Other'];
 const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Facebook','Other'];
-const BUILD='2026-10-18-marketing-v5.6.1';
+const BUILD='2026-10-18-marketing-v5.6.2';
 const TTL=30*24*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
@@ -264,7 +264,7 @@ async function createApp(options={}) {
       if(assets[url.pathname]){const [file,type]=assets[url.pathname];const bytes=await fs.readFile(path.join(__dirname,'assets',file));res.writeHead(200,{'Content-Type':type,'X-Content-Type-Options':'nosniff','Cache-Control':'public, max-age=3600'});return res.end(req.method==='HEAD'?undefined:bytes);}
       if(!['/','/index.html'].includes(url.pathname))throw error(404,'Not found.');
       res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'same-origin','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':`default-src 'self'; script-src 'self' ${scripts}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'`});res.end(req.method==='HEAD'?undefined:html);
-    }catch(e){if(!res.headersSent&&!res.destroyed)send(res,e.status||500,{error:e.status?e.message:'Could not save or complete the request. Please try again.',...(e.status&&/^PAYOUT_[A-Z_]+$/.test(e.code||'')?{code:e.code}:{})});if(!e.status)console.error('Request failed:',e.code||e.message);}
+    }catch(e){if(!res.headersSent&&!res.destroyed)send(res,e.status||500,{error:e.status?e.message:'Could not save or complete the request. Please try again.',...(e.status&&/^PAYOUT_[A-Z_]+$/.test(e.code||'')?{code:e.code,...(e.diagnostic?{diagnostic:e.diagnostic}:{})}:{})});if(!e.status)console.error('Request failed:',e.code||e.message);}
   });
   server.requestTimeout=15000;server.headersTimeout=10000;
   return {server,store,async close(){clearInterval(cleanup);await new Promise(resolve=>{server.close(resolve);server.closeIdleConnections();});await store.close();}};
