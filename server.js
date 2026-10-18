@@ -18,11 +18,14 @@ const BUILD='2026-10-18-marketing-v5.6.5';
 const TTL=30*24*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
-const safeMember=(m,viewer=m)=>({...Object.fromEntries(['id','name','handle','username','role','initials','createdAt','active','mustChangePassword','photo'].map(k=>[k,m[k]])),hasWallet:!!m.walletAddress,channels:m.channels||[],profileComplete:m.role==='Owner'||!!m.fullName,...(m.role!=='Owner'&&(viewer.id===m.id||viewer.role==='Owner')?{fullName:m.fullName||'',phone:m.phone||''}:{}),...(viewer.id===m.id||viewer.role==='Owner'?{walletAddress:m.walletAddress||''}:{}),recoveryReady:!!m.recovery&&Date.parse(m.recovery.expiresAt)>Date.now()});
+const safeMember=(m,viewer=m)=>({...Object.fromEntries(['id','name','handle','username','role','initials','createdAt','active','mustChangePassword','photo'].map(k=>[k,m[k]])),hasWallet:!!m.walletAddress,channels:m.channels||[],profileComplete:m.role==='Owner'||!!m.fullName&&!!m.walletAddress,...(m.role!=='Owner'&&(viewer.id===m.id||viewer.role==='Owner')?{fullName:m.fullName||'',phone:m.phone||''}:{}),...(viewer.id===m.id||viewer.role==='Owner'?{walletAddress:m.walletAddress||''}:{}),recoveryReady:!!m.recovery&&Date.parse(m.recovery.expiresAt)>Date.now()});
 const validPassword=p=>typeof p==='string'&&p.length>=12&&p.length<=200;
-function memberInput(body) {
+function teamManager(who){if(!['Owner','Manager'].includes(who.role))throw error(403,'Permission denied.');}
+function canManage(who,target,action){teamManager(who);if(who.role==='Manager'&&(target.role!=='Member'||target.id===who.id||action==='role'))throw error(403,'Permission denied.');}
+function memberInput(body, onboarding=false) {
+  if(onboarding)body={...body,name:body.name||body.username};
   if(typeof body.name!=='string'||body.name.trim().length<2||body.name.trim().length>50||typeof body.username!=='string'||!/^[a-zA-Z0-9_.-]{3,32}$/.test(body.username)||!validPassword(body.password))throw error(400,'Enter a name, a valid username, and a password of 12–200 characters.');
-  if(!Wallet.validWallet(body.walletAddress))throw error(400,'Enter a valid Solana receiving wallet address.');
+  if((!onboarding||body.walletAddress)&&!Wallet.validWallet(body.walletAddress))throw error(400,'Enter a valid Solana receiving wallet address.');
   const name=body.name.trim(),username=body.username.toLowerCase();
   return {id:crypto.randomUUID(),walletAddress:body.walletAddress,name,username,handle:'@'+String(body.handle||username).trim().replace(/^@+/,'').slice(0,40),initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),createdAt:new Date().toISOString(),active:true,authVersion:0};
 }
@@ -157,6 +160,7 @@ async function createApp(options={}) {
       if(typeof b.photo!=='string'||(b.photo!==''&&!validPhoto(b.photo)))throw error(400,'Choose a JPEG photo smaller than 100 KB.');
       if(!Wallet.validWallet(b.walletAddress))throw error(400,'Enter a valid Solana receiving wallet address.');
       const contact=member.role==='Owner'?{}:Channels.contact({...b,role:member.role});
+      if(b.handle!==undefined){if(typeof b.handle!=='string'||b.handle.trim().length>40)throw error(400,'Invalid Telegram handle.');contact.handle=b.handle.trim()?'@'+b.handle.trim().replace(/^@+/,''):'';}
       const updated=await store.transaction(d=>{const who=actor(req,d);Object.assign(who,{...contact,walletAddress:b.walletAddress,name,initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),photo:b.photo});if(who.role==='Owner'){delete who.fullName;delete who.phone;}audit(d,who,'profile_updated',who.id);return who;});
       return send(res,200,{member:safeMember(updated)});
     }
@@ -204,15 +208,16 @@ async function createApp(options={}) {
       owner(actor(req));return send(res,200,store.data,{'Content-Disposition':`attachment; filename="seven-team-backup-${new Date().toISOString().slice(0,10)}.json"`});
     }
     if(req.method==='POST'&&route==='/api/members'){
-      owner(member);throttle('member-create:'+member.id,30);const b=await readBody(req);
-      const m={...memberInput(b),...Channels.contact({...b,role:b.role==='Manager'?'Manager':'Member'}),channels:[],...await cryptoWork(()=>hashPassword(b.password)),role:b.role==='Manager'?'Manager':'Member',mustChangePassword:true};
-      await store.transaction(d=>{const who=actor(req,d);owner(who);if(d.members.some(x=>x.username===m.username))throw error(409,'That username is already in the team.');d.members.push(m);audit(d,who,'member_created',m.id,{role:m.role});});return send(res,201,{member:safeMember(m)});
+      teamManager(member);throttle('member-create:'+member.id,30);const b=await readBody(req);
+      if(member.role==='Manager'&&b.role&&b.role!=='Member')throw error(403,'Permission denied.');
+      const m={...memberInput(b,true),...(b.fullName?Channels.contact({...b,role:b.role==='Manager'?'Manager':'Member'}):{}),channels:[],...await cryptoWork(()=>hashPassword(b.password)),role:b.role==='Manager'?'Manager':'Member',mustChangePassword:true};
+      await store.transaction(d=>{const who=actor(req,d);teamManager(who);if(who.role==='Manager'&&m.role!=='Member')throw error(403,'Permission denied.');if(d.members.some(x=>x.username===m.username))throw error(409,'That username is already in the team.');d.members.push(m);audit(d,who,'member_created',m.id,{role:m.role});});return send(res,201,{member:safeMember(m)});
     }
     const manage=route.match(/^\/api\/members\/([a-f0-9-]+)$/);
     if(req.method==='POST'&&manage){
-      owner(member);const b=await readBody(req);const actions=['role','active','reset-password'];if(!actions.includes(b.action))throw error(400,'Invalid member action.');
+      teamManager(member);const b=await readBody(req);const target=store.data.members.find(x=>x.id===manage[1]);if(!target)throw error(404,'Member not found.');canManage(member,target,b.action);const actions=['role','active','reset-password'];if(!actions.includes(b.action))throw error(400,'Invalid member action.');
       let creds;if(b.action==='reset-password'){throttle('reset:'+member.id,20);if(!validPassword(b.password))throw error(400,'Use a password of 12–200 characters.');creds=await cryptoWork(()=>hashPassword(b.password));}
-      const changed=await store.transaction(d=>{const who=actor(req,d);owner(who);const m=d.members.find(x=>x.id===manage[1]);if(!m)throw error(404,'Member not found.');if(m.role==='Owner')throw error(409,'The owner cannot be suspended or changed here.');
+      const changed=await store.transaction(d=>{const who=actor(req,d);const m=d.members.find(x=>x.id===manage[1]);if(!m)throw error(404,'Member not found.');canManage(who,m,b.action);if(m.role==='Owner')throw error(409,'The owner cannot be suspended or changed here.');
         if(b.action==='role'){if(!['Manager','Member'].includes(b.role))throw error(400,'Invalid role.');m.role=b.role;}
         if(b.action==='active'){if(typeof b.active!=='boolean')throw error(400,'Invalid status.');m.active=b.active;}
         if(creds){Object.assign(m,creds,{mustChangePassword:true});delete m.recovery;}m.authVersion++;audit(d,who,'member_'+b.action,m.id,{role:m.role,active:m.active});return m;});
