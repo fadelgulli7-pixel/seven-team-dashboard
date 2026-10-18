@@ -1,3 +1,18 @@
+# SEVEN Marketing v5.6.3 — diagnostic visible without downloads
+
+Build: `2026-10-18-marketing-v5.6.3`.
+
+Wallet browser downloads did not work on the user's device. On PAYOUT_MESSAGE_CHANGED the dialog now directly shows a compact readable difference summary and the full diagnostic JSON in a read-only text field. Copy payment diagnostic writes to the clipboard when allowed; if blocked or unavailable it focuses and selects the text for manual copy. A screenshot of the compact summary is also useful. No Blob download is required. No report is automatically sent or stored, and no signed transaction/private key/signature is included.
+
+This is an evidence collection usability fix. It does not assert that the signed-message mismatch is fixed. Exact-message/signature/reservation security remains unchanged. Solflare domain classification still needs its own support review.
+
+Validation: 68 tests pass. Tests cover visible summary, full JSON, permitted clipboard, rejected clipboard and missing clipboard; locale parity and prior payment/security tests. Inline browser script parses. No production mutation, funds sent or real mobile-wallet test performed.
+
+Upload the complete source to the existing repository, keeping DATA_DIR and all existing data/session files. Build npm ci; start node server.js. Verify the build above. After a rejected signed-message attempt the report appears automatically: copy the diagnostic text or send a screenshot; do not repeatedly retry amounts or wallets.
+
+---
+Historical notes:
+
 # SEVEN Marketing v5.6.2 — signed-message diagnostics
 
 Build: `2026-10-18-marketing-v5.6.2`.

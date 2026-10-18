@@ -1,64 +1,90 @@
-SEVEN Marketing v5.3 — local validation
-
-45 tests passed, 0 failed (Node 24.19.0).
-Includes real HTTP/session/CSRF API tests, independent page approval, inactive-page rejection, stale decisions, contact validation, phone privacy, approved-source enforcement, owner-only exact-cent custom rewards, weekly caps and historical-store compatibility.
-All browser inline scripts parse. Browser rendering was not visually verified: local Chromium was unavailable and browser download failed. No production deployment or production data migration was executed here.
+SEVEN Marketing v5.6.3 — local verification
+Browser inline script syntax passed.
+No dependency changes from v5.6.1 audit.
 
 npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
 
-> seven-team-dashboard@5.3.0 test
+> seven-team-dashboard@5.6.3 test
 > node --test test/*.test.js
 
-✔ password hashes are salted, bounded and verified; rate limits expire (2477.872064ms)
-✔ setup is protected and single-use; anonymous, CSRF and origin requests blocked (1105.858381ms)
-✔ missing or wrong setup token cannot create owner (258.294971ms)
-✔ member workflow, concurrent duplicates, rejection, correction, approval, stale version and suspension (3140.832158ms)
-✔ owner cannot self-approve and password reset revokes sessions (2606.134185ms)
-✔ serialized writes survive reopen; lock blocks second writer; failed write rolls back (270.138475ms)
-✔ corrupt, unknown-schema and missing initialized data fail closed without overwrite (74.430186ms)
-✔ HTML scripts parse and CSP matches actual inline bytes (701.393691ms)
-✔ production fails closed without explicit data path (0.926605ms)
-✔ maintenance backup verification and owner recovery preserve records and survive restart (1494.278475ms)
-✔ profile updates are authenticated, private to the member, persisted and validated (1871.825973ms)
-✔ rankings use approved work only, include everyone, share tied ranks and handle zero work (39.366333ms)
-✔ frontend summaries render real member names, all rows, percentages and safe text (97.877298ms)
-✔ single-use recovery is password-gated, hash-only, persisted, rotated and revokes all sessions (3788.831635ms)
-✔ recovery cannot bypass suspension, expiry or a later owner password reset (3749.78485ms)
-✔ workspace money and contributions share one revision and never leak recovery credentials (404.06144ms)
-✔ recovery codes are consumed atomically under concurrent requests (1121.777773ms)
-✔ recovery entry screens and fixed task reward amounts render without a wallet or revenue source (38.50966ms)
-✔ fixed reward workflow is atomic, private, budgeted and independent of the retired treasury (1522.532301ms)
-✔ policy control is owner-only; budget failure rolls back work approval; quoted prices stay fixed (1518.726803ms)
-✔ referral purchase API grants exactly five percent, protects receipts and rejects self review (2079.483826ms)
-✔ a Telegram submission cannot claim the X post price through the API (730.526019ms)
-✔ wallet ownership privacy, required profiles and owner-only SEVEN transfer preparation (1074.63841ms)
-✔ configured SEVEN links use the saved wallet and never mutate the payment ledger (1225.192477ms)
-✔ contacts, platform domains, independent activity review, rejection and stale versions (8.795407ms)
-✔ custom rewards require owner, exact cents, reason, independent review and existing caps (29.154243ms)
-✔ real API blocks unapproved sources, hides phone from peers and records owner custom reward (3323.503916ms)
-✔ four original social posts earn ten dollars, independently of income or a project wallet (51.5118ms)
-✔ pending work, self review, unverified quality and repeated evidence cannot earn money (5.051427ms)
-✔ canonical evidence normalizes tracking parameters, host and trailing slash (1.255422ms)
-✔ member, team, unpaid and task-type weekly caps are enforced without creating extra grants (10.087262ms)
-✔ submission prices survive policy changes and do not reprice earned work (4.357686ms)
-✔ payment cannot exceed earned cents; voiding preserves an auditable history (4.889315ms)
-✔ USD cents are exact and reject negative, fractional cents and unsafe numbers (5.625032ms)
-✔ weekly budgets use Monday in Baghdad, not the server timezone (1.195322ms)
-✔ old approvals have no automatic monetary value until an independent reward decision (2.645789ms)
-✔ a reviewer cannot silently change a submitted paid quote to an unpaid approval (1.920174ms)
-✔ effort-based pricing separates Telegram from X and is calculated on the server (0.584293ms)
-✔ v5 policy upgrade preserves old Telegram quotes, grants and budgets (3.410541ms)
-✔ verified $100 purchase earns exactly $5 only after independent confirmation (7.096162ms)
-✔ unverified purchases, self referral and duplicate orders or receipts cannot earn again (8.683619ms)
-✔ commission uses verified net value, rounds down to cents and rejects false attribution (4.609277ms)
-✔ reversal keeps the purchase used and audit records intact; shared unpaid cap never trims the five percent (5.667252ms)
-✔ an owner or manager cannot independently confirm their own referred purchase (5.466581ms)
-✔ historical treasury records stay readable without a live source or a wallet connector (34.054428ms)
-ℹ tests 45
+✔ password hashes are salted, bounded and verified; rate limits expire (368.067618ms)
+✔ setup is protected and single-use; anonymous, CSRF and origin requests blocked (280.174301ms)
+✔ missing or wrong setup token cannot create owner (107.806312ms)
+✔ member workflow, concurrent duplicates, rejection, correction, approval, stale version and suspension (729.374559ms)
+✔ owner cannot self-approve and password reset revokes sessions (701.63975ms)
+✔ serialized writes survive reopen; lock blocks second writer; failed write rolls back (31.737863ms)
+✔ corrupt, unknown-schema and missing initialized data fail closed without overwrite (12.387532ms)
+✔ HTML scripts parse and CSP matches actual inline bytes (172.793564ms)
+✔ production fails closed without explicit data path (0.449361ms)
+✔ maintenance backup verification and owner recovery preserve records and survive restart (612.044068ms)
+✔ profile updates are authenticated, private to the member, persisted and validated (336.092572ms)
+✔ rankings use approved work only, include everyone, share tied ranks and handle zero work (6.566259ms)
+✔ frontend summaries render real member names, all rows, percentages and safe text (19.536969ms)
+✔ single-use recovery is password-gated, hash-only, persisted, rotated and revokes all sessions (1040.61443ms)
+✔ recovery cannot bypass suspension, expiry or a later owner password reset (1143.518651ms)
+✔ workspace money and contributions share one revision and never leak recovery credentials (158.884999ms)
+✔ recovery codes are consumed atomically under concurrent requests (322.313011ms)
+✔ recovery entry screens and fixed task reward amounts render without a wallet or revenue source (13.749266ms)
+✔ fixed reward workflow is atomic, private, budgeted and independent of the retired treasury (605.224197ms)
+✔ policy control is owner-only; budget failure rolls back work approval; quoted prices stay fixed (527.071447ms)
+✔ referral purchase API grants exactly five percent, protects receipts and rejects self review (866.656204ms)
+✔ a Telegram submission cannot claim the X post price through the API (193.118648ms)
+✔ wallet ownership privacy, required profiles and owner-only SEVEN transfer preparation (514.020017ms)
+✔ configured SEVEN links use the saved wallet and never mutate the payment ledger (501.792851ms)
+✔ contacts, platform domains, independent activity review, rejection and stale versions (2.934226ms)
+✔ custom rewards require owner, exact cents, reason, independent review and existing caps (22.549164ms)
+✔ real API blocks unapproved sources, hides phone from peers and records owner custom reward (1151.243042ms)
+✔ seven locale choices preserve personal text and use correct writing directions (9.158483ms)
+✔ all registered interface keys exist in every locale and switching reverses previously translated labels (10.058551ms)
+✔ expired payment is reconciled before opening wallet signing (3.238924ms)
+✔ uncertain broadcast notice is visible and signing is preceded by reconciliation (1.019439ms)
+✔ owner sees and copies diagnostic without download; blocked clipboard selects report text (2.393581ms)
+✔ signed Phantom payment is exact, reserved before broadcast, reconciled once and ledger-backed (157.851532ms)
+✔ tampered, wrong-signer and expired unsigned payments cannot create a payout (23.086521ms)
+✔ chain failure never records payment; uncertain result never releases reservation (33.989399ms)
+✔ campaign requires approved brief, per-member limits, spacing and independent quality scores (1.027722ms)
+✔ Solflare-style provider signs real reserved transaction and server records only one confirmed payment (28.644747ms)
+✔ prepared fees prevent automatic wallet insertion; browser bundle preserves exact signed message (133.478634ms)
+✔ specific validation errors preserve reservations and never broadcast altered or unsigned bytes (54.08458ms)
+✔ legacy prepared messages remain immutable and expire without modifying saved history (39.318728ms)
+✔ message diagnostics identify changed fees, blockhash and instructions without exporting signed transaction bytes (26.940831ms)
+✔ four original social posts earn ten dollars, independently of income or a project wallet (28.542877ms)
+✔ pending work, self review, unverified quality and repeated evidence cannot earn money (1.721442ms)
+✔ canonical evidence normalizes tracking parameters, host and trailing slash (0.40079ms)
+✔ member, team, unpaid and task-type weekly caps are enforced without creating extra grants (3.019372ms)
+✔ submission prices survive policy changes and do not reprice earned work (1.789352ms)
+✔ payment cannot exceed earned cents; voiding preserves an auditable history (1.264901ms)
+✔ USD cents are exact and reject negative, fractional cents and unsafe numbers (3.40601ms)
+✔ weekly budgets use Monday in Baghdad, not the server timezone (4.173699ms)
+✔ old approvals have no automatic monetary value until an independent reward decision (1.537202ms)
+✔ a reviewer cannot silently change a submitted paid quote to an unpaid approval (0.773688ms)
+✔ effort-based pricing separates Telegram from X and is calculated on the server (5.539309ms)
+✔ v5 policy upgrade preserves old Telegram quotes, grants and budgets (2.84155ms)
+✔ verified $100 purchase earns exactly $5 only after independent confirmation (2.097084ms)
+✔ unverified purchases, self referral and duplicate orders or receipts cannot earn again (1.167617ms)
+✔ commission uses verified net value, rounds down to cents and rejects false attribution (0.486916ms)
+✔ reversal keeps the purchase used and audit records intact; shared unpaid cap never trims the five percent (2.112708ms)
+✔ an owner or manager cannot independently confirm their own referred purchase (1.567707ms)
+✔ classic SPL instructions and ATA derivation match captured official SDK bytes (16.216996ms)
+✔ mint decoder rejects wrong program, truncated and uninitialized accounts (0.730174ms)
+✔ upgraded JSON RPC client makes and validates a real local HTTP request (44.646465ms)
+✔ historical treasury records stay readable without a live source or a wallet connector (2.885635ms)
+✔ Solflare is selected explicitly; boolean/undefined connect results use provider publicKey (1.052808ms)
+✔ wrong account and rejected connection never reach signing; missing selected wallet never falls back (0.808269ms)
+✔ wallet browse links encode the app and return to the explicitly selected provider (0.390164ms)
+✔ Solflare config survives validation, legacy Phantom stays readable, pending payment reservations survive switches (6.854834ms)
+✔ optional telephone, project contact exemption and scheduled deliverables are enforced (3.076756ms)
+✔ session survives a real server restart; hashed tokens only; logout and password revocation persist (665.017739ms)
+ℹ tests 68
 ℹ suites 0
-ℹ pass 45
+ℹ pass 68
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 33122.332039
+ℹ duration_ms 9517.597192
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice

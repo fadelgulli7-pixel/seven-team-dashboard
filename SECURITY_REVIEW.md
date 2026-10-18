@@ -1,3 +1,8 @@
+# Current supplement — v5.6.3
+
+No-download owner diagnostic summary/text field and clipboard/manual-selection fallback. No payout validation relaxation. 68 regression tests pass. Unresolved mobile signed-message mismatch remains under investigation.
+
+---
 # Current supplement — 5.6.2
 
 The supplied live screenshot still rejects a changed signed message. The cause remains unconfirmed. Added owner-only bounded diagnostic response and explicit download of a summary containing no signed transaction or signature. No authorization or message-equality checks relaxed. 68 tests pass. Production deployment and real mobile payment remain unverified. See README.md for current instructions and limitations.

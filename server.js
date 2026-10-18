@@ -14,7 +14,7 @@ const {validPhoto}=require('./lib/profile');
 const {hashPassword,verifyPassword,equalSecret,Limiter}=require('./lib/security');
 const categories=['Marketing','Content','Community','Partnership','Development','Other'];
 const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Facebook','Other'];
-const BUILD='2026-10-18-marketing-v5.6.2';
+const BUILD='2026-10-18-marketing-v5.6.3';
 const TTL=30*24*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
