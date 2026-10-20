@@ -5,6 +5,7 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const {FileStore}=require('./lib/store');
 const Rewards=require('./lib/rewards');
+const TeamTools=require('./lib/team-tools');
 const Channels=require('./lib/channels');
 const Payouts=require('./lib/payouts');
 const Campaigns=require('./lib/campaigns');
@@ -56,12 +57,15 @@ async function createApp(options={}) {
   // Read required assets before acquiring the data-directory lock.
   const html=await fs.readFile(path.join(__dirname,'index.html'));
   // Refuse a partial upload before opening the persistent store.
-  for(const asset of ['seven-logo.png','contributions.js','languages.js','solana-web3.js','wallets.js']){
+  for(const asset of ['team-tools.js','seven-logo.png','contributions.js','languages.js','solana-web3.js','wallets.js']){
     try{await fs.access(path.join(__dirname,'assets',asset));}
     catch{throw Error('Missing assets/'+asset+'. Upload the entire assets folder from the ZIP.');}
   }
   const dummy=await hashPassword(crypto.randomBytes(32).toString('hex'));
   const store=options.store||await new FileStore(path.resolve(dataDir)).open();
+  let teamTools;
+  try{teamTools=TeamTools.open(path.resolve(dataDir));}catch(e){await store.close();throw e;}
+  const publicActivity=({history,fingerprint,requestKey,evidenceIds,...a},who)=>({...a,...(who.id===a.memberId||['Owner','Manager'].includes(who.role)?{evidenceIds:evidenceIds||[]}: {})});
   const sessionFile=path.join(path.resolve(dataDir),'sessions.json');
   const sessionFs=require('node:fs');
   let saved=[];try{saved=JSON.parse(await fs.readFile(sessionFile,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
@@ -146,6 +150,13 @@ async function createApp(options={}) {
       revoke(member.id);return beginSession(req,res,updated);
     }
     actor(req);
+    if(route==='/api/chat'&&req.method==='GET')return send(res,200,teamTools.list(url.searchParams.get('before')));
+    if(route==='/api/chat'&&req.method==='POST'){throttle('chat:'+member.id,20,60000);const b=await readBody(req);return send(res,201,{id:teamTools.message(actor(req),b)});}
+    if(route==='/api/chat/remove'&&req.method==='POST'){const b=await readBody(req);teamTools.remove(actor(req),b.id);return send(res,200,{ok:true});}
+    if(route==='/api/evidence'&&req.method==='POST'){throttle('evidence:'+member.id,15,60000);const b=await readBody(req,1400100);return send(res,201,{id:teamTools.upload(actor(req),b)});}
+    const evidenceRoute=route.match(/^\/api\/evidence\/([a-f0-9-]+)$/);
+    if(evidenceRoute&&req.method==='GET'){const bytes=teamTools.image(actor(req),evidenceRoute[1],store.data);res.writeHead(200,{'Content-Type':'image/jpeg','Content-Length':bytes.length,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Content-Disposition':'inline; filename="screenshot.jpg"'});return res.end(Buffer.from(bytes));}
+
     if(req.method==='POST'&&route==='/api/recovery/code'){
       throttle('recovery-generate:'+member.id,8);const b=await readBody(req);
       if(!await cryptoWork(()=>verifyPassword(b.password,member)))throw error(401,'Current password is incorrect.');
@@ -171,7 +182,7 @@ async function createApp(options={}) {
       const b=await readBody(req);const channel=await store.transaction(d=>{const who=actor(req,d),target=d.members.find(m=>m.id===b.memberId);if(!target)throw error(404,'Member not found.');const c=Channels.review(target,b,who);audit(d,who,'channel_'+c.status,c.id,{memberId:target.id,note:c.note});return c;});return send(res,200,{channel});
     }
     if(route==='/api/finance'||route.startsWith('/api/finance/'))throw error(410,'Revenue sharing has been retired.');
-    const rewardView=()=>{const view=Rewards.summary(store.data);view.walletPayments=(store.data.payoutJobs||[]).filter(j=>member.role==='Owner'||j.memberId===member.id).map(j=>Object.fromEntries(['id','memberId','status','amount','usdCents','recipient','source','signature','createdAt','confirmedAt'].map(k=>[k,j[k]])));if(member.role!=='Owner')view.payments=view.payments.map(p=>Object.fromEntries(['id','memberId','amountCents','currency','createdAt','voidedAt'].map(k=>[k,p[k]])));if(!['Owner','Manager'].includes(member.role))view.referrals=view.referrals.filter(c=>c.memberId===member.id).map(c=>Object.fromEntries(['id','memberId','claimedUsdCents','verifiedUsdCents','commissionCents','status','createdAt','confirmedAt','reviewNote','reversalReason'].map(k=>[k,c[k]])));return view;};
+    const rewardView=()=>{const view=Rewards.summary(store.data);view.walletPayments=(store.data.payoutJobs||[]).filter(j=>member.role==='Owner'||j.memberId===member.id).map(j=>Object.fromEntries(['id','memberId','status','amount','usdCents','recipient','source','signature','createdAt','confirmedAt'].map(k=>[k,j[k]])));if(member.role!=='Owner')view.payments=view.payments.map(p=>Object.fromEntries(['id','memberId','amountCents','currency','createdAt','voidedAt'].map(k=>[k,p[k]])));if(!['Owner','Manager'].includes(member.role))view.referrals=view.referrals.filter(c=>c.memberId===member.id).map(c=>Object.fromEntries(['id','memberId','claimedUsdCents','verifiedUsdCents','commissionCents','status','createdAt','confirmedAt','reviewNote','reversalReason','evidenceIds'].map(k=>[k,c[k]])));return view;};
     if(req.method==='POST'&&route==='/api/rewards/prepare-transfer'){
       owner(member);const b=await readBody(req);const d=store.data;owner(actor(req,d));
       if(b.revision!==d.revision)throw error(409,'This record changed. Refresh and try again.');
@@ -189,18 +200,18 @@ async function createApp(options={}) {
     if(req.method==='GET'&&route==='/api/rewards')return send(res,200,rewardView());
     if(req.method==='GET'&&route==='/api/workspace'){
       const d=store.data;
-      return send(res,200,{member:safeMember(member),members:d.members.map(m=>safeMember(m,member)),activities:d.activities.map(({history,fingerprint,requestKey,...a})=>a),revision:d.revision,build:BUILD,campaigns:d.campaigns||[],rewards:rewardView()});
+      return send(res,200,{member:safeMember(member),members:d.members.map(m=>safeMember(m,member)),activities:d.activities.map(a=>publicActivity(a,member)),revision:d.revision,build:BUILD,campaigns:d.campaigns||[],rewards:rewardView()});
     }
     if(req.method==='POST'&&['/api/rewards/policy','/api/rewards/payment','/api/rewards/void','/api/rewards/award','/api/rewards/referral','/api/rewards/referral-review'].includes(route)){
       const b=await readBody(req);const result=await store.transaction(d=>{const who=actor(req,d);if(b.revision!==d.revision)throw error(409,'This record changed. Refresh and try again.');let r;
-        if(route.endsWith('/referral')){throttle('referral-claim:'+who.id,20,60000);r=Rewards.claimReferral(d,b,who);}
+        if(route.endsWith('/referral')){throttle('referral-claim:'+who.id,20,60000);const evidenceIds=teamTools.owned(who,b.evidenceIds);r=Rewards.claimReferral(d,b,who);r.evidenceIds=evidenceIds;}
         else if(route.endsWith('/referral-review')){r=Rewards.reviewReferral(d,b,who);}
         else if(route.endsWith('/award')){const a=d.activities.find(a=>a.id===b.activityId);if(!a)throw error(404,'Activity not found.');if(b.version!==a.version)throw error(409,'This record changed. Refresh and try again.');r=Rewards.award(d,a,b,who);if(!r)throw error(400,'Choose a paid reward type.');}
         else{owner(who);if(route.endsWith('/policy'))r=Rewards.updatePolicy(d,b);else if(route.endsWith('/payment')){Payouts.unreserved(d,b.memberId);r=Rewards.payment(d,b,who);}else{const entry=d.rewards?.[b.kind==='grant'?'grants':'payments']?.find(x=>x.id===b.id);if(entry)Payouts.unreserved(d,entry.memberId);if(b.kind==='payment'&&(d.payoutJobs||[]).some(j=>j.paymentId===b.id&&j.status==='confirmed'))throw error(409,'Confirmed on-chain payments cannot be voided here.');r=Rewards.voidEntry(d,b,who);}}
         audit(d,who,'rewards.'+route.split('/').pop(),r.id,{amountCents:r.amountCents||null});return r;
       });return send(res,201,{id:result.id});
     }
-    if(req.method==='GET'&&route==='/api/data')return send(res,200,{member:safeMember(member),members:store.data.members.map(m=>safeMember(m,member)),activities:store.data.activities.map(({history,fingerprint,requestKey,...a})=>a),revision:store.data.revision,build:BUILD});
+    if(req.method==='GET'&&route==='/api/data')return send(res,200,{member:safeMember(member),members:store.data.members.map(m=>safeMember(m,member)),activities:store.data.activities.map(a=>publicActivity(a,member)),revision:store.data.revision,build:BUILD});
     if(req.method==='GET'&&route==='/api/audit'){owner(member);return send(res,200,{events:store.data.audit.slice(-200).reverse()});}
     if(req.method==='POST'&&route==='/api/backup'){
       owner(member);const b=await readBody(req);throttle('backup:'+member.id,3);
@@ -226,7 +237,7 @@ async function createApp(options={}) {
     if(req.method==='POST'&&route==='/api/activities'){
       throttle('activity:'+member.id,30,60000);const b=await readBody(req),input=activityInput(b);
       if(typeof b.requestKey!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(b.requestKey))throw error(400,'Refresh the activity form and try again.');
-      const result=await store.transaction(d=>{const who=actor(req,d);if(!Wallet.validWallet(who.walletAddress))throw error(400,'Save your Solana wallet in Edit profile before submitting work.');const prior=d.activities.find(a=>a.memberId===who.id&&a.requestKey===b.requestKey);if(prior){if(prior.fingerprint!==fingerprint({...input,memberId:who.id,sourceId:b.sourceId,campaignId:b.campaignId}))throw error(409,'This submission was already used. Open a new form.');return {activity:prior,duplicate:true};}const source=Channels.approvedSource(who,{...b,platform:input.platform});const campaign=Campaigns.source(d,who,{...b,platform:input.platform});const payload={...input,...Rewards.quote(d,b),memberId:who.id,sourceId:source.id,sourceUrl:source.url,campaignId:campaign.id,campaignTitle:campaign.title};const hash=fingerprint(payload);
+      const result=await store.transaction(d=>{const who=actor(req,d);if(!Wallet.validWallet(who.walletAddress))throw error(400,'Save your Solana wallet in Edit profile before submitting work.');const prior=d.activities.find(a=>a.memberId===who.id&&a.requestKey===b.requestKey);if(prior){if(prior.fingerprint!==fingerprint({...input,memberId:who.id,sourceId:b.sourceId,campaignId:b.campaignId}))throw error(409,'This submission was already used. Open a new form.');return {activity:prior,duplicate:true};}const source=Channels.approvedSource(who,{...b,platform:input.platform});const campaign=Campaigns.source(d,who,{...b,platform:input.platform});const payload={...input,evidenceIds:teamTools.owned(who,b.evidenceIds),...Rewards.quote(d,b),memberId:who.id,sourceId:source.id,sourceUrl:source.url,campaignId:campaign.id,campaignTitle:campaign.title};const hash=fingerprint(payload);
         const existing=d.activities.find(a=>a.memberId===who.id&&a.requestKey===b.requestKey);
         if(existing){if(existing.fingerprint!==hash)throw error(409,'This submission was already used. Open a new form.');return {activity:existing,duplicate:true};}
         const duplicate=d.activities.find(a=>a.memberId===who.id&&(a.fingerprint===hash||(input.link&&a.link===input.link)));
@@ -252,7 +263,7 @@ async function createApp(options={}) {
           if(a.status==='approved')throw error(409,'Approved work is locked.');
           const source=Channels.approvedSource(who,{...b,platform:activityInput(b).platform});const campaign=Campaigns.source(d,who,{...b,platform:activityInput(b).platform},a.id);if(['none','custom'].includes(b.rewardType||'none'))delete a.rewardQuote;const input=activityInput(b),hash=fingerprint({...input,memberId:who.id,sourceId:source.id,campaignId:campaign.id});
           if(d.activities.some(x=>x.id!==a.id&&x.memberId===who.id&&(x.fingerprint===hash||(input.link&&x.link===input.link))))throw error(409,'This work is already recorded.');
-          Object.assign(a,input,Rewards.quote(d,b,a),{sourceId:source.id,sourceUrl:source.url,campaignId:campaign.id,campaignTitle:campaign.title,fingerprint:hash,status:'pending',reviewNote:'',reviewedBy:null,reviewedAt:null,updatedAt:new Date().toISOString()});audit(d,who,'activity_corrected',a.id);
+          Object.assign(a,input,{evidenceIds:teamTools.owned(who,b.evidenceIds===undefined?a.evidenceIds:b.evidenceIds)},Rewards.quote(d,b,a),{sourceId:source.id,sourceUrl:source.url,campaignId:campaign.id,campaignTitle:campaign.title,fingerprint:hash,status:'pending',reviewNote:'',reviewedBy:null,reviewedAt:null,updatedAt:new Date().toISOString()});audit(d,who,'activity_corrected',a.id);
         }
         a.history.push(before);a.version++;return a;});return send(res,200,{activity:result});
     }
@@ -265,14 +276,14 @@ async function createApp(options={}) {
       if(url.pathname.startsWith('/api/'))return await api(req,res,url);
       if(url.pathname==='/health'&&req.method==='GET')return send(res,200,{ok:true,build:BUILD});
       if(!['GET','HEAD'].includes(req.method))throw error(405,'Method not allowed.');
-      const assets={'/assets/wallets.js':['wallets.js','text/javascript; charset=utf-8'],'/assets/languages.js':['languages.js','text/javascript; charset=utf-8'],'/assets/solana-web3.js':['solana-web3.js','text/javascript; charset=utf-8'],'/assets/seven-logo.png':['seven-logo.png','image/png'],'/assets/contributions.js':['contributions.js','text/javascript; charset=utf-8']};
+      const assets={'/assets/team-tools.js':['team-tools.js','text/javascript; charset=utf-8'],'/assets/wallets.js':['wallets.js','text/javascript; charset=utf-8'],'/assets/languages.js':['languages.js','text/javascript; charset=utf-8'],'/assets/solana-web3.js':['solana-web3.js','text/javascript; charset=utf-8'],'/assets/seven-logo.png':['seven-logo.png','image/png'],'/assets/contributions.js':['contributions.js','text/javascript; charset=utf-8']};
       if(assets[url.pathname]){const [file,type]=assets[url.pathname];const bytes=await fs.readFile(path.join(__dirname,'assets',file));res.writeHead(200,{'Content-Type':type,'X-Content-Type-Options':'nosniff','Cache-Control':'public, max-age=3600'});return res.end(req.method==='HEAD'?undefined:bytes);}
       if(!['/','/index.html'].includes(url.pathname))throw error(404,'Not found.');
       res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'same-origin','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':`default-src 'self'; script-src 'self' ${scripts}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'`});res.end(req.method==='HEAD'?undefined:html);
     }catch(e){if(!res.headersSent&&!res.destroyed)send(res,e.status||500,{error:e.status?e.message:'Could not save or complete the request. Please try again.',...(e.status&&/^PAYOUT_[A-Z_]+$/.test(e.code||'')?{code:e.code,...(e.diagnostic?{diagnostic:e.diagnostic}:{})}:{})});if(!e.status)console.error('Request failed:',e.code||e.message);}
   });
   server.requestTimeout=15000;server.headersTimeout=10000;
-  return {server,store,async close(){clearInterval(cleanup);await new Promise(resolve=>{server.close(resolve);server.closeIdleConnections();});await store.close();}};
+  return {server,store,async close(){clearInterval(cleanup);await new Promise(resolve=>{server.close(resolve);server.closeIdleConnections();});teamTools.close();await store.close();}};
 }
 if(require.main===module){
   createApp().then(app=>{app.server.listen(Number(process.env.PORT)||3000,'0.0.0.0',()=>console.log('SEVEN Team '+BUILD+' ready'));let stopping=false;for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>{if(stopping)return;stopping=true;app.close().then(()=>process.exit(0));});}).catch(e=>{console.error('Startup failed:',e.message);process.exitCode=1;});
