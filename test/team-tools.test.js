@@ -54,6 +54,14 @@ test('HTTP authentication, private evidence and existing reward balances are pre
  assert.equal(app.store.data.rewards.grants[0].amountCents,100);
  await call(member,'/api/profile',{name:'Test Member',fullName:'Test Example Member',walletAddress:wallet,photo:''});
  const channel=(await call(member,'/api/channels',{platform:'Website',url:'https://example.org/member'},201)).channel;
+ const queueSnapshot=JSON.stringify(app.store.data),queueRevision=app.store.data.revision;
+ const ownerQueue=await call(owner,'/api/workspace');
+ assert.equal(ownerQueue.members.find(m=>m.id===created.member.id).channels[0].status,'pending');
+ assert.equal(ownerQueue.activities.length,0); // Registering a page is not submitting work.
+ assert.equal(JSON.stringify(app.store.data),queueSnapshot);assert.equal(app.store.data.revision,queueRevision);
+ await call(member,'/api/channels',{platform:'X (Twitter)',url:'https://x.com/test/status/123'},400);
+ assert.equal(JSON.stringify(app.store.data),queueSnapshot);assert.equal(app.store.data.revision,queueRevision);
+
  await call(owner,'/api/channels/review',{memberId:created.member.id,channelId:channel.id,version:1,status:'approved',note:'Verified test channel',activeConfirmed:true,ownershipConfirmed:true});
  const campaign=(await call(owner,'/api/campaigns',{title:'Test campaign',objective:'Test screenshot evidence',brief:'Submit original content with supporting evidence.',deadline:new Date(Date.now()+86400000).toISOString(),maxPerMember:3,gapHours:1},201)).campaign;
  const payload={title:'Original test work',description:'Test work',category:'Content',platform:'Website',link:'https://example.org/work-001',sourceId:channel.id,campaignId:campaign.id,rewardType:'none',requestKey:crypto.randomUUID(),evidenceIds:[pic.id]};
