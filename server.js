@@ -7,6 +7,7 @@ const {FileStore}=require('./lib/store');
 const Rewards=require('./lib/rewards');
 const TeamTools=require('./lib/team-tools');
 const Channels=require('./lib/channels');
+const WorkRecovery=require('./lib/work-recovery');
 const Payouts=require('./lib/payouts');
 const Campaigns=require('./lib/campaigns');
 const Wallet=require('./lib/wallet');
@@ -178,6 +179,9 @@ async function createApp(options={}) {
     if(req.method==='POST'&&route==='/api/channels'){
       const b=await readBody(req);const channel=await store.transaction(d=>{const who=actor(req,d);Channels.contact(who);const c=Channels.add(who,b);audit(d,who,'channel_submitted',c.id);return c;});return send(res,201,{channel});
     }
+    if(req.method==='POST'&&route==='/api/channels/recover-work'){
+      const b=await readBody(req);const result=await store.transaction(d=>{const who=actor(req,d);const r=WorkRecovery.recover(d,b,who);if(!r.duplicate)audit(d,who,'channel_work_recovered',r.activity.id,{memberId:b.memberId,channelId:b.channelId,note:b.note});return r;});return send(res,result.duplicate?200:201,result);
+    }
     if(req.method==='POST'&&route==='/api/channels/review'){
       const b=await readBody(req);const channel=await store.transaction(d=>{const who=actor(req,d),target=d.members.find(m=>m.id===b.memberId);if(!target)throw error(404,'Member not found.');const c=Channels.review(target,b,who);audit(d,who,'channel_'+c.status,c.id,{memberId:target.id,note:c.note});return c;});return send(res,200,{channel});
     }
@@ -206,7 +210,7 @@ async function createApp(options={}) {
       const b=await readBody(req);const result=await store.transaction(d=>{const who=actor(req,d);if(b.revision!==d.revision)throw error(409,'This record changed. Refresh and try again.');let r;
         if(route.endsWith('/referral')){throttle('referral-claim:'+who.id,20,60000);const evidenceIds=teamTools.owned(who,b.evidenceIds);r=Rewards.claimReferral(d,b,who);r.evidenceIds=evidenceIds;}
         else if(route.endsWith('/referral-review')){r=Rewards.reviewReferral(d,b,who);}
-        else if(route.endsWith('/award')){const a=d.activities.find(a=>a.id===b.activityId);if(!a)throw error(404,'Activity not found.');if(b.version!==a.version)throw error(409,'This record changed. Refresh and try again.');r=Rewards.award(d,a,b,who);if(!r)throw error(400,'Choose a paid reward type.');}
+        else if(route.endsWith('/award')){const a=d.activities.find(a=>a.id===b.activityId);if(!a)throw error(404,'Activity not found.');if(b.version!==a.version)throw error(409,'This record changed. Refresh and try again.');WorkRecovery.checkReward(d,a);r=Rewards.award(d,a,b,who);if(!r)throw error(400,'Choose a paid reward type.');}
         else{owner(who);if(route.endsWith('/policy'))r=Rewards.updatePolicy(d,b);else if(route.endsWith('/payment')){Payouts.unreserved(d,b.memberId);r=Rewards.payment(d,b,who);}else{const entry=d.rewards?.[b.kind==='grant'?'grants':'payments']?.find(x=>x.id===b.id);if(entry)Payouts.unreserved(d,entry.memberId);if(b.kind==='payment'&&(d.payoutJobs||[]).some(j=>j.paymentId===b.id&&j.status==='confirmed'))throw error(409,'Confirmed on-chain payments cannot be voided here.');r=Rewards.voidEntry(d,b,who);}}
         audit(d,who,'rewards.'+route.split('/').pop(),r.id,{amountCents:r.amountCents||null});return r;
       });return send(res,201,{id:result.id});
@@ -256,7 +260,7 @@ async function createApp(options={}) {
           if(!['approved','rejected'].includes(b.status))throw error(400,'Invalid review.');
           const note=String(b.note||'').trim();if(note.length>300||b.status==='rejected'&&note.length<3)throw error(400,'Give a short reason for rejection (3–300 characters).');
           Object.assign(a,{status:b.status,reviewNote:note,reviewedBy:who.name,reviewedAt:new Date().toISOString()});
-          if(b.status==='approved'){if(a.campaignId)a.qualityScores=Campaigns.quality(b);if(a.sourceId)Channels.approvedSource(d.members.find(m=>m.id===a.memberId),a);const grant=Rewards.award(d,a,b,who);if(grant)a.rewardGrantId=grant.id;}
+          if(b.status==='approved'){if(a.recoveredChannel&&(!b.rewardType||b.rewardType==='none'))throw error(400,'Choose the agreed paid reward type for recovered work.');if(a.campaignId)a.qualityScores=Campaigns.quality(b);if(a.sourceId)Channels.approvedSource(d.members.find(m=>m.id===a.memberId),a);WorkRecovery.checkReward(d,a);const grant=Rewards.award(d,a,b,who);if(grant)a.rewardGrantId=grant.id;}
           audit(d,who,'activity_'+b.status,a.id,{note});
         }else{
           if(a.memberId!==who.id)throw error(403,'Only the author can correct this work.');
