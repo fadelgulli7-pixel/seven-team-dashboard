@@ -179,6 +179,9 @@ async function createApp(options={}) {
     if(req.method==='POST'&&route==='/api/channels'){
       const b=await readBody(req);const channel=await store.transaction(d=>{const who=actor(req,d);Channels.contact(who);const c=Channels.add(who,b);audit(d,who,'channel_submitted',c.id);return c;});return send(res,201,{channel});
     }
+    if(req.method==='POST'&&route==='/api/channels/approve-work'){
+      const b=await readBody(req);const result=await store.transaction(d=>{const r=WorkRecovery.approve(d,b,actor(req,d));if(!r.duplicate)audit(d,actor(req,d),'recovered_work_approved',r.activity.id,{memberId:b.memberId,channelId:b.channelId,grantId:r.grant.id,amountCents:r.grant.amountCents,note:b.note});return r;});return send(res,result.duplicate?200:201,result);
+    }
     if(req.method==='POST'&&route==='/api/channels/recover-work'){
       const b=await readBody(req);const result=await store.transaction(d=>{const who=actor(req,d);const r=WorkRecovery.recover(d,b,who);if(!r.duplicate)audit(d,who,'channel_work_recovered',r.activity.id,{memberId:b.memberId,channelId:b.channelId,note:b.note});return r;});return send(res,result.duplicate?200:201,result);
     }
@@ -260,7 +263,7 @@ async function createApp(options={}) {
           if(!['approved','rejected'].includes(b.status))throw error(400,'Invalid review.');
           const note=String(b.note||'').trim();if(note.length>300||b.status==='rejected'&&note.length<3)throw error(400,'Give a short reason for rejection (3–300 characters).');
           Object.assign(a,{status:b.status,reviewNote:note,reviewedBy:who.name,reviewedAt:new Date().toISOString()});
-          if(b.status==='approved'){if(a.recoveredChannel&&(!b.rewardType||b.rewardType==='none'))throw error(400,'Choose the agreed paid reward type for recovered work.');if(a.campaignId)a.qualityScores=Campaigns.quality(b);if(a.sourceId)Channels.approvedSource(d.members.find(m=>m.id===a.memberId),a);WorkRecovery.checkReward(d,a);const grant=Rewards.award(d,a,b,who);if(grant)a.rewardGrantId=grant.id;}
+          if(b.status==='approved'){if(a.recoveredChannel&&(!b.rewardType||b.rewardType==='none'))throw error(400,'Choose the agreed paid reward type for recovered work.');if(a.campaignId&&b.reviewConfirmed!==true)a.qualityScores=Campaigns.quality(b);if(a.sourceId)Channels.approvedSource(d.members.find(m=>m.id===a.memberId),a);WorkRecovery.checkReward(d,a);const grant=Rewards.award(d,a,b,who);if(grant)a.rewardGrantId=grant.id;}
           audit(d,who,'activity_'+b.status,a.id,{note});
         }else{
           if(a.memberId!==who.id)throw error(403,'Only the author can correct this work.');
