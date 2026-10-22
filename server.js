@@ -173,7 +173,7 @@ async function createApp(options={}) {
       if(!Wallet.validWallet(b.walletAddress))throw error(400,'Enter a valid Solana receiving wallet address.');
       const contact=member.role==='Owner'?{}:Channels.contact({...b,role:member.role});
       if(b.handle!==undefined){if(typeof b.handle!=='string'||b.handle.trim().length>40)throw error(400,'Invalid Telegram handle.');contact.handle=b.handle.trim()?'@'+b.handle.trim().replace(/^@+/,''):'';}
-      const updated=await store.transaction(d=>{const who=actor(req,d);Object.assign(who,{...contact,walletAddress:b.walletAddress,name,initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),photo:b.photo});if(who.role==='Owner'){delete who.fullName;delete who.phone;}audit(d,who,'profile_updated',who.id);return who;});
+      const updated=await store.transaction(d=>{const who=actor(req,d);Object.assign(who,{...contact,walletAddress:b.walletAddress,name,initials:name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),photo:b.photo});if(who.role==='Owner'){delete who.fullName;delete who.phone;}for(const c of Channels.addProfilePages(who,b.socialPages))audit(d,who,'channel_submitted',c.id);audit(d,who,'profile_updated',who.id);return who;});
       return send(res,200,{member:safeMember(updated)});
     }
     if(req.method==='POST'&&route==='/api/channels'){
