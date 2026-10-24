@@ -17,7 +17,7 @@ const {validPhoto}=require('./lib/profile');
 const {hashPassword,verifyPassword,equalSecret,Limiter}=require('./lib/security');
 const categories=['Marketing','Content','Community','Partnership','Development','Other'];
 const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Facebook','Other'];
-const BUILD='2026-10-24-marketing-v5.7.0';
+const BUILD='2026-10-24-marketing-v5.7.1';
 const TTL=30*24*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
@@ -152,12 +152,13 @@ async function createApp(options={}) {
       revoke(member.id);return beginSession(req,res,updated);
     }
     actor(req);
+    if(route==='/api/submission-attempts'&&req.method==='GET')return send(res,200,{submissions:teamTools.submissions(actor(req)),unlinkedEvidence:teamTools.unlinked(actor(req),store.data)});
     if(route==='/api/chat'&&req.method==='GET')return send(res,200,teamTools.list(url.searchParams.get('before')));
     if(route==='/api/chat'&&req.method==='POST'){throttle('chat:'+member.id,20,60000);const b=await readBody(req);return send(res,201,{id:teamTools.message(actor(req),b)});}
     if(route==='/api/chat/remove'&&req.method==='POST'){const b=await readBody(req);teamTools.remove(actor(req),b.id);return send(res,200,{ok:true});}
     if(route==='/api/evidence'&&req.method==='POST'){throttle('evidence:'+member.id,15,60000);const b=await readBody(req,28500000);return send(res,201,{id:teamTools.upload(actor(req),b)});}
     const evidenceRoute=route.match(/^\/api\/evidence\/([a-f0-9-]+)$/);
-    if(evidenceRoute&&req.method==='GET'){const bytes=teamTools.image(actor(req),evidenceRoute[1],store.data);res.writeHead(200,{'Content-Type':teamTools.mime(evidenceRoute[1]),'Content-Length':bytes.length,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Content-Disposition':'inline'});return res.end(Buffer.from(bytes));}
+    if(evidenceRoute&&req.method==='GET'){const bytes=teamTools.image(actor(req),evidenceRoute[1],store.data,url.searchParams.get('recovery')==='1');res.writeHead(200,{'Content-Type':teamTools.mime(evidenceRoute[1]),'Content-Length':bytes.length,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Content-Disposition':'inline'});return res.end(Buffer.from(bytes));}
 
     if(req.method==='POST'&&route==='/api/recovery/code'){
       throttle('recovery-generate:'+member.id,8);const b=await readBody(req);
@@ -243,11 +244,11 @@ async function createApp(options={}) {
       revoke(changed.id);return send(res,200,{member:safeMember(changed)});
     }
     if(req.method==='POST'&&route==='/api/offline-activities'){
-      throttle('activity:'+member.id,30,60000);const b=await readBody(req),input=activityInput(b);
-      const result=await store.transaction(d=>{const who=actor(req,d);if(!Wallet.validWallet(who.walletAddress))throw error(400,'Save your Solana wallet in Edit profile before submitting work.');const r=Offline.submit(d,who,b,input,teamTools.owned(who,b.evidenceIds),teamTools.digests(b.evidenceIds||[]));if(!r.duplicate)audit(d,who,'offline_work_submitted',r.activity.id);return r;});return send(res,result.duplicate?200:201,result);
+      throttle('activity:'+member.id,30,60000);const b=await readBody(req);req.submissionId=teamTools.beginSubmission(actor(req),b);const input=activityInput(b);
+      const result=await store.transaction(d=>{const who=actor(req,d);if(!Wallet.validWallet(who.walletAddress))throw error(400,'Save your Solana wallet in Edit profile before submitting work.');const r=Offline.submit(d,who,b,input,teamTools.owned(who,b.evidenceIds),teamTools.digests(b.evidenceIds||[]));if(!r.duplicate)audit(d,who,'offline_work_submitted',r.activity.id);return r;});teamTools.finishSubmission(req.submissionId,result.activity.id);return send(res,result.duplicate?200:201,{...result,receiptId:req.submissionId});
     }
     if(req.method==='POST'&&route==='/api/activities'){
-      throttle('activity:'+member.id,30,60000);const b=await readBody(req),input=activityInput(b);
+      throttle('activity:'+member.id,30,60000);const b=await readBody(req);req.submissionId=teamTools.beginSubmission(actor(req),b);const input=activityInput(b);
       if(typeof b.requestKey!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(b.requestKey))throw error(400,'Refresh the activity form and try again.');
       const result=await store.transaction(d=>{const who=actor(req,d);if(!Wallet.validWallet(who.walletAddress))throw error(400,'Save your Solana wallet in Edit profile before submitting work.');const prior=d.activities.find(a=>a.memberId===who.id&&a.requestKey===b.requestKey);if(prior){if(prior.fingerprint!==fingerprint({...input,memberId:who.id,sourceId:b.sourceId,campaignId:b.campaignId}))throw error(409,'This submission was already used. Open a new form.');return {activity:prior,duplicate:true};}const source=Channels.approvedSource(who,{...b,platform:input.platform});const campaign=Campaigns.source(d,who,{...b,platform:input.platform});const payload={...input,evidenceIds:teamTools.owned(who,b.evidenceIds),...Rewards.quote(d,b),memberId:who.id,sourceId:source.id,sourceUrl:source.url,campaignId:campaign.id,campaignTitle:campaign.title};const hash=fingerprint(payload);
         const existing=d.activities.find(a=>a.memberId===who.id&&a.requestKey===b.requestKey);
@@ -255,7 +256,7 @@ async function createApp(options={}) {
         const duplicate=d.activities.find(a=>a.memberId===who.id&&(a.fingerprint===hash||(input.link&&a.link===input.link)));
         if(duplicate)throw error(409,'This work is already recorded. Correct the existing entry if needed.');
         const a={...payload,id:crypto.randomUUID(),user:who.name,handle:who.handle,initials:who.initials,status:'pending',version:1,history:[],fingerprint:hash,requestKey:b.requestKey,createdAt:new Date().toISOString()};
-        d.activities.unshift(a);audit(d,who,'activity_submitted',a.id);return {activity:a,duplicate:false};});return send(res,result.duplicate?200:201,result);
+        d.activities.unshift(a);audit(d,who,'activity_submitted',a.id);return {activity:a,duplicate:false};});teamTools.finishSubmission(req.submissionId,result.activity.id);return send(res,result.duplicate?200:201,{...result,receiptId:req.submissionId});
     }
     const work=route.match(/^\/api\/activities\/([a-f0-9-]+)\/(review|edit)$/);
     if(req.method==='POST'&&work){
@@ -292,7 +293,7 @@ async function createApp(options={}) {
       if(assets[url.pathname]){const [file,type]=assets[url.pathname];const bytes=await fs.readFile(path.join(__dirname,'assets',file));res.writeHead(200,{'Content-Type':type,'X-Content-Type-Options':'nosniff','Cache-Control':'public, max-age=3600'});return res.end(req.method==='HEAD'?undefined:bytes);}
       if(!['/','/index.html'].includes(url.pathname))throw error(404,'Not found.');
       res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY','Referrer-Policy':'same-origin','Permissions-Policy':'camera=(), microphone=(), geolocation=()','Content-Security-Policy':`default-src 'self'; script-src 'self' ${scripts}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'`});res.end(req.method==='HEAD'?undefined:html);
-    }catch(e){if(!res.headersSent&&!res.destroyed)send(res,e.status||500,{error:e.status?e.message:'Could not save or complete the request. Please try again.',...(e.status&&/^PAYOUT_[A-Z_]+$/.test(e.code||'')?{code:e.code,...(e.diagnostic?{diagnostic:e.diagnostic}:{})}:{})});if(!e.status)console.error('Request failed:',e.code||e.message);}
+    }catch(e){if(req.submissionId){try{teamTools.finishSubmission(req.submissionId,null,e.status?e.message:'Server error. Please retry with the same submission.');}catch{}}if(!res.headersSent&&!res.destroyed)send(res,e.status||500,{...(req.submissionId?{receiptId:req.submissionId}:{}),error:e.status?e.message:'Could not save or complete the request. Please try again.',...(e.status&&/^PAYOUT_[A-Z_]+$/.test(e.code||'')?{code:e.code,...(e.diagnostic?{diagnostic:e.diagnostic}:{})}:{})});if(!e.status)console.error('Request failed:',e.code||e.message);}
   });
   server.requestTimeout=15000;server.headersTimeout=10000;
   return {server,store,async close(){clearInterval(cleanup);await new Promise(resolve=>{server.close(resolve);server.closeIdleConnections();});teamTools.close();await store.close();}};
