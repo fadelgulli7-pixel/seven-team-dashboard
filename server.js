@@ -6,6 +6,7 @@ const crypto=require('node:crypto');
 const {FileStore}=require('./lib/store');
 const Rewards=require('./lib/rewards');
 const TeamTools=require('./lib/team-tools');
+const Offline=require('./lib/offline');
 const Channels=require('./lib/channels');
 const WorkRecovery=require('./lib/work-recovery');
 const Payouts=require('./lib/payouts');
@@ -16,7 +17,7 @@ const {validPhoto}=require('./lib/profile');
 const {hashPassword,verifyPassword,equalSecret,Limiter}=require('./lib/security');
 const categories=['Marketing','Content','Community','Partnership','Development','Other'];
 const platforms=['X (Twitter)','Telegram','YouTube','TikTok','Instagram','Discord','Website','Blog','Business','Facebook','Other'];
-const BUILD='2026-10-18-marketing-v5.6.5';
+const BUILD='2026-10-24-marketing-v5.7.0';
 const TTL=30*24*60*60*1000;
 const COOKIE='seven_session';
 const error=(status,message)=>Object.assign(new Error(message),{status});
@@ -66,7 +67,7 @@ async function createApp(options={}) {
   const store=options.store||await new FileStore(path.resolve(dataDir)).open();
   let teamTools;
   try{teamTools=TeamTools.open(path.resolve(dataDir));}catch(e){await store.close();throw e;}
-  const publicActivity=({history,fingerprint,requestKey,evidenceIds,...a},who)=>({...a,...(who.id===a.memberId||['Owner','Manager'].includes(who.role)?{evidenceIds:evidenceIds||[]}: {})});
+  const publicActivity=({history,fingerprint,requestKey,evidenceIds,evidenceDigests,...a},who)=>({...a,...(who.id===a.memberId||['Owner','Manager'].includes(who.role)?{evidenceIds:evidenceIds||[]}: {})});
   const sessionFile=path.join(path.resolve(dataDir),'sessions.json');
   const sessionFs=require('node:fs');
   let saved=[];try{saved=JSON.parse(await fs.readFile(sessionFile,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
@@ -154,9 +155,9 @@ async function createApp(options={}) {
     if(route==='/api/chat'&&req.method==='GET')return send(res,200,teamTools.list(url.searchParams.get('before')));
     if(route==='/api/chat'&&req.method==='POST'){throttle('chat:'+member.id,20,60000);const b=await readBody(req);return send(res,201,{id:teamTools.message(actor(req),b)});}
     if(route==='/api/chat/remove'&&req.method==='POST'){const b=await readBody(req);teamTools.remove(actor(req),b.id);return send(res,200,{ok:true});}
-    if(route==='/api/evidence'&&req.method==='POST'){throttle('evidence:'+member.id,15,60000);const b=await readBody(req,1400100);return send(res,201,{id:teamTools.upload(actor(req),b)});}
+    if(route==='/api/evidence'&&req.method==='POST'){throttle('evidence:'+member.id,15,60000);const b=await readBody(req,28500000);return send(res,201,{id:teamTools.upload(actor(req),b)});}
     const evidenceRoute=route.match(/^\/api\/evidence\/([a-f0-9-]+)$/);
-    if(evidenceRoute&&req.method==='GET'){const bytes=teamTools.image(actor(req),evidenceRoute[1],store.data);res.writeHead(200,{'Content-Type':'image/jpeg','Content-Length':bytes.length,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Content-Disposition':'inline; filename="screenshot.jpg"'});return res.end(Buffer.from(bytes));}
+    if(evidenceRoute&&req.method==='GET'){const bytes=teamTools.image(actor(req),evidenceRoute[1],store.data);res.writeHead(200,{'Content-Type':teamTools.mime(evidenceRoute[1]),'Content-Length':bytes.length,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Content-Disposition':'inline'});return res.end(Buffer.from(bytes));}
 
     if(req.method==='POST'&&route==='/api/recovery/code'){
       throttle('recovery-generate:'+member.id,8);const b=await readBody(req);
@@ -189,7 +190,7 @@ async function createApp(options={}) {
       const b=await readBody(req);const channel=await store.transaction(d=>{const who=actor(req,d),target=d.members.find(m=>m.id===b.memberId);if(!target)throw error(404,'Member not found.');const c=Channels.review(target,b,who);audit(d,who,'channel_'+c.status,c.id,{memberId:target.id,note:c.note});return c;});return send(res,200,{channel});
     }
     if(route==='/api/finance'||route.startsWith('/api/finance/'))throw error(410,'Revenue sharing has been retired.');
-    const rewardView=()=>{const view=Rewards.summary(store.data);view.walletPayments=(store.data.payoutJobs||[]).filter(j=>member.role==='Owner'||j.memberId===member.id).map(j=>Object.fromEntries(['id','memberId','status','amount','usdCents','recipient','source','signature','createdAt','confirmedAt'].map(k=>[k,j[k]])));if(member.role!=='Owner')view.payments=view.payments.map(p=>Object.fromEntries(['id','memberId','amountCents','currency','createdAt','voidedAt'].map(k=>[k,p[k]])));if(!['Owner','Manager'].includes(member.role))view.referrals=view.referrals.filter(c=>c.memberId===member.id).map(c=>Object.fromEntries(['id','memberId','claimedUsdCents','verifiedUsdCents','commissionCents','status','createdAt','confirmedAt','reviewNote','reversalReason','evidenceIds'].map(k=>[k,c[k]])));return view;};
+    const rewardView=()=>{const view=Rewards.summary(store.data);view.walletPayments=(store.data.payoutJobs||[]).filter(j=>member.role==='Owner'||j.memberId===member.id).map(j=>Object.fromEntries(['id','memberId','status','amount','usdCents','recipient','source','signature','createdAt','confirmedAt'].map(k=>[k,j[k]])));if(member.role!=='Owner')view.payments=view.payments.map(p=>Object.fromEntries(['id','memberId','amountCents','currency','createdAt','voidedAt'].map(k=>[k,p[k]])));if(!['Owner','Manager'].includes(member.role))view.referrals=view.referrals.filter(c=>c.memberId===member.id).map(c=>Object.fromEntries(['id','memberId','claimedUsdCents','verifiedUsdCents','commissionCents','status','createdAt','confirmedAt','reviewNote','reversalReason','evidenceIds','verificationMethod','manualDetails','orderId'].map(k=>[k,c[k]])));return view;};
     if(req.method==='POST'&&route==='/api/rewards/prepare-transfer'){
       owner(member);const b=await readBody(req);const d=store.data;owner(actor(req,d));
       if(b.revision!==d.revision)throw error(409,'This record changed. Refresh and try again.');
@@ -211,7 +212,7 @@ async function createApp(options={}) {
     }
     if(req.method==='POST'&&['/api/rewards/policy','/api/rewards/payment','/api/rewards/void','/api/rewards/award','/api/rewards/referral','/api/rewards/referral-review'].includes(route)){
       const b=await readBody(req);const result=await store.transaction(d=>{const who=actor(req,d);if(b.revision!==d.revision)throw error(409,'This record changed. Refresh and try again.');let r;
-        if(route.endsWith('/referral')){throttle('referral-claim:'+who.id,20,60000);const evidenceIds=teamTools.owned(who,b.evidenceIds);r=Rewards.claimReferral(d,b,who);r.evidenceIds=evidenceIds;}
+        if(route.endsWith('/referral')){throttle('referral-claim:'+who.id,20,60000);const evidenceIds=teamTools.owned(who,b.evidenceIds);r=Rewards.claimReferral(d,b,who);r.evidenceIds=evidenceIds;r.evidenceDigests=teamTools.digests(evidenceIds);}
         else if(route.endsWith('/referral-review')){r=Rewards.reviewReferral(d,b,who);}
         else if(route.endsWith('/award')){const a=d.activities.find(a=>a.id===b.activityId);if(!a)throw error(404,'Activity not found.');if(b.version!==a.version)throw error(409,'This record changed. Refresh and try again.');WorkRecovery.checkReward(d,a);r=Rewards.award(d,a,b,who);if(!r)throw error(400,'Choose a paid reward type.');}
         else{owner(who);if(route.endsWith('/policy'))r=Rewards.updatePolicy(d,b);else if(route.endsWith('/payment')){Payouts.unreserved(d,b.memberId);r=Rewards.payment(d,b,who);}else{const entry=d.rewards?.[b.kind==='grant'?'grants':'payments']?.find(x=>x.id===b.id);if(entry)Payouts.unreserved(d,entry.memberId);if(b.kind==='payment'&&(d.payoutJobs||[]).some(j=>j.paymentId===b.id&&j.status==='confirmed'))throw error(409,'Confirmed on-chain payments cannot be voided here.');r=Rewards.voidEntry(d,b,who);}}
@@ -241,6 +242,10 @@ async function createApp(options={}) {
         if(creds){Object.assign(m,creds,{mustChangePassword:true});delete m.recovery;}m.authVersion++;audit(d,who,'member_'+b.action,m.id,{role:m.role,active:m.active});return m;});
       revoke(changed.id);return send(res,200,{member:safeMember(changed)});
     }
+    if(req.method==='POST'&&route==='/api/offline-activities'){
+      throttle('activity:'+member.id,30,60000);const b=await readBody(req),input=activityInput(b);
+      const result=await store.transaction(d=>{const who=actor(req,d);if(!Wallet.validWallet(who.walletAddress))throw error(400,'Save your Solana wallet in Edit profile before submitting work.');const r=Offline.submit(d,who,b,input,teamTools.owned(who,b.evidenceIds),teamTools.digests(b.evidenceIds||[]));if(!r.duplicate)audit(d,who,'offline_work_submitted',r.activity.id);return r;});return send(res,result.duplicate?200:201,result);
+    }
     if(req.method==='POST'&&route==='/api/activities'){
       throttle('activity:'+member.id,30,60000);const b=await readBody(req),input=activityInput(b);
       if(typeof b.requestKey!=='string'||!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(b.requestKey))throw error(400,'Refresh the activity form and try again.');
@@ -268,9 +273,9 @@ async function createApp(options={}) {
         }else{
           if(a.memberId!==who.id)throw error(403,'Only the author can correct this work.');
           if(a.status==='approved')throw error(409,'Approved work is locked.');
-          const source=Channels.approvedSource(who,{...b,platform:activityInput(b).platform});const campaign=Campaigns.source(d,who,{...b,platform:activityInput(b).platform},a.id);if(['none','custom'].includes(b.rewardType||'none'))delete a.rewardQuote;const input=activityInput(b),hash=fingerprint({...input,memberId:who.id,sourceId:source.id,campaignId:campaign.id});
+          if(a.workMode==='offline'){Offline.edit(d,a,b,activityInput(b),teamTools.owned(who,b.evidenceIds),teamTools.digests(b.evidenceIds||[]));audit(d,who,'offline_work_corrected',a.id);}else{const source=Channels.approvedSource(who,{...b,platform:activityInput(b).platform});const campaign=Campaigns.source(d,who,{...b,platform:activityInput(b).platform},a.id);if(['none','custom'].includes(b.rewardType||'none'))delete a.rewardQuote;const input=activityInput(b),hash=fingerprint({...input,memberId:who.id,sourceId:source.id,campaignId:campaign.id});
           if(d.activities.some(x=>x.id!==a.id&&x.memberId===who.id&&(x.fingerprint===hash||(input.link&&x.link===input.link))))throw error(409,'This work is already recorded.');
-          Object.assign(a,input,{evidenceIds:teamTools.owned(who,b.evidenceIds===undefined?a.evidenceIds:b.evidenceIds)},Rewards.quote(d,b,a),{sourceId:source.id,sourceUrl:source.url,campaignId:campaign.id,campaignTitle:campaign.title,fingerprint:hash,status:'pending',reviewNote:'',reviewedBy:null,reviewedAt:null,updatedAt:new Date().toISOString()});audit(d,who,'activity_corrected',a.id);
+          Object.assign(a,input,{evidenceIds:teamTools.owned(who,b.evidenceIds===undefined?a.evidenceIds:b.evidenceIds)},Rewards.quote(d,b,a),{sourceId:source.id,sourceUrl:source.url,campaignId:campaign.id,campaignTitle:campaign.title,fingerprint:hash,status:'pending',reviewNote:'',reviewedBy:null,reviewedAt:null,updatedAt:new Date().toISOString()});audit(d,who,'activity_corrected',a.id);}
         }
         a.history.push(before);a.version++;return a;});return send(res,200,{activity:result});
     }
