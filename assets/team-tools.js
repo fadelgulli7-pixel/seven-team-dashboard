@@ -65,3 +65,19 @@ const WORK_LABELS={
 };
 const baseInstallTeamTools=installTeamTools;
 installTeamTools=function(){for(const [key,v]of Object.entries(WORK_LABELS)){(UI_TEXT.ku??={})[key]=v[0];(UI_TEXT.ar??={})[key]=v[1];}baseInstallTeamTools();};
+
+Object.assign(WORK_LABELS,{
+'Submission receipts':['وەرگرتنێن فرێکرنا کاران','إيصالات إرسال الأعمال'],
+'Submission receipts and uploaded evidence':['وەرگرتن و بەڵگەیێن بارکری','الإيصالات والأدلة المرفوعة'],
+'Work saved. Keep this receipt:':['کار هاتە تۆمارکرن. ڤێ ژمارەیێ هەلبگرە:','تم حفظ العمل. احتفظ بهذا الإيصال:'],
+'Check the highlighted field:':['ڤێ خانەیێ بپشکنە:','تحقق من الحقل المحدد:'],
+'Close without submitting? Your work has not been saved.':['بێ فرێکرنێ دەرکەڤی؟ کارێ تە هێشتا نەهاتیە تۆمارکرن.','إغلاق دون إرسال؟ لم يتم حفظ عملك بعد.'],
+'Failed submissions are not approved work. Review the reason and ask the member to correct and submit again.':['فرێکرنێن سەرنەکەفتی کارێ پەسەندکری نینن. هۆکاری بپشکنە و ژ ئەندامی بخوازە ڕاست بکەت و بفرێکەت.','المحاولات الفاشلة ليست أعمالاً معتمدة. راجع السبب واطلب من العضو التصحيح وإعادة الإرسال.'],
+'Uploaded evidence without a work record':['بەڵگەیێن بارکری بێ تۆمارا کاری','أدلة مرفوعة دون سجل عمل'],
+'These files alone are not submitted or approved work. Contact the named member to complete the work form.':['ئەڤ فایلە بتنێ تۆمار یان پەسەندکرنا کاری نینن. پەیوەندیێ ب ئەندامی بکە دا فۆڕما کاری تەمام بکەت.','هذه الملفات وحدها ليست إرسالاً أو اعتماداً للعمل. تواصل مع العضو لإكمال النموذج.'],
+'No recorded submission attempts yet.':['هێشتا چ تۆمارێن فرێکرنێ نینن.','لا توجد محاولات إرسال مسجلة بعد.'],
+'needs_correction':['پێدڤی ب ڕاستکرنێ یە','يحتاج إلى تصحيح'],
+'accepted':['هاتە تۆمارکرن','تم الحفظ'],
+'received':['هاتە وەرگرتن؛ هێشتا تۆمار نەبوویە','تم الاستلام؛ لم يكتمل الحفظ بعد'],
+'Saved activity':['کارێ تۆمارکری','العمل المحفوظ']
+});
